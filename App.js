@@ -7,7 +7,7 @@ import { Colors } from './src/theme/colors';
 
 export default function App() {
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider style={styles.root}>
       <View style={styles.container}>
         <StatusBar style="light" backgroundColor={Colors.background} />
         <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -19,12 +19,19 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    height: '100%',
+    backgroundColor: Colors.background,
+  },
   container: {
     flex: 1,
+    height: '100%',
     backgroundColor: Colors.background,
   },
   safeArea: {
     flex: 1,
+    height: '100%',
   },
 });
 

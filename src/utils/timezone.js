@@ -62,11 +62,25 @@ export function formatChileFullDate(dateInput) {
  */
 export function calculateTimeRemaining(targetDate) {
   if (!targetDate) return { days: 0, hours: 0, minutes: 0, seconds: 0, isPassed: true };
-  const target = typeof targetDate === 'string' ? new Date(targetDate).getTime() : targetDate.getTime();
-  const now = new Date().getTime();
+  
+  // Si ya es un objeto formateado, retornarlo de inmediato
+  if (typeof targetDate === 'object' && typeof targetDate.days === 'number') {
+    return targetDate;
+  }
+
+  let target;
+  if (typeof targetDate === 'string' || typeof targetDate === 'number') {
+    target = new Date(targetDate).getTime();
+  } else if (targetDate instanceof Date || typeof targetDate.getTime === 'function') {
+    target = targetDate.getTime();
+  } else {
+    return { days: 0, hours: 0, minutes: 0, seconds: 0, isPassed: true };
+  }
+
+  const now = Date.now();
   const diff = target - now;
 
-  if (diff <= 0) {
+  if (diff <= 0 || isNaN(diff)) {
     return { days: 0, hours: 0, minutes: 0, seconds: 0, isPassed: true };
   }
 
