@@ -1,0 +1,64 @@
+@startuml CMP01_componentes
+package "Cliente Móvil & Web (React Native / Expo)" {
+    package "Capa de Presentación (Screens)" {
+        [HomeScreen]
+        [LiveScreen]
+        [ClasificacionScreen]
+        [CalendarioScreen]
+        [DetalleGPScreen]
+        [PerfilPilotoScreen]
+        [ARScreen]
+        [ComparadorScreen]
+        [FavoritosScreen]
+        [PerfilScreen]
+        [MasScreen]
+        [HistorialWebScreen]
+    }
+
+    package "Componentes UI Reutilizables" {
+        [DriverCard]
+        [RaceCard]
+        [StandingsTable]
+        [CountdownTimer]
+        [TelemetryWidget]
+        [TrackMap]
+        [OfflineBanner]
+        [SessionCard]
+        [LoadingScreen]
+    }
+
+    package "Capa de Servicios" {
+        interface IF1Data
+        [F1DataService] -up-|> IF1Data
+        [LocalStorageManager]
+        [AuthService]
+        [OpenF1Client]
+    }
+
+    package "Capa de Modelo (Dominio)" {
+        [Piloto]
+        [Escuderia]
+        [GranPremio]
+        [Circuito]
+        [Sesion]
+        [ResultadoSesion]
+    }
+}
+
+cloud "Servicios Externos" {
+    [OpenF1 API REST]
+    [Supabase Platform]
+}
+
+[HomeScreen] --> [F1DataService]
+[ClasificacionScreen] --> [F1DataService]
+[CalendarioScreen] --> [F1DataService]
+[PerfilPilotoScreen] --> [LocalStorageManager]
+[FavoritosScreen] --> [LocalStorageManager]
+
+[F1DataService] --> [LocalStorageManager]
+[F1DataService] --> [OpenF1Client]
+[OpenF1Client] --> [OpenF1 API REST]: HTTPS / JSON
+[AuthService] --> [Supabase Platform]: Auth & RLS
+@enduml
+

@@ -1,0 +1,40 @@
+@startuml SD05_perfil_piloto_favoritos
+actor Usuario
+participant PerfilPilotoScreen
+participant LocalStorageManager
+participant F1DataService
+participant OpenF1Client
+participant "API OpenF1" as OpenF1
+
+Usuario -> PerfilPilotoScreen: Seleccionar piloto (driverId)
+PerfilPilotoScreen -> F1DataService: getDriverById(driverId)
+F1DataService -> OpenF1Client: getDrivers(driver_number=driverId)
+OpenF1Client -> OpenF1: GET /drivers?driver_number={id}
+OpenF1 --> OpenF1Client: HTTP 200 OK + JSON
+OpenF1Client --> F1DataService: Datos del piloto
+PerfilPilotoScreen -> LocalStorageManager: esFavorito(driverId)
+LocalStorageManager --> PerfilPilotoScreen: true / false
+
+alt Es favorito
+    PerfilPilotoScreen --> Usuario: Mostrar perfil con estrella activa (llena)
+else No es favorito
+    PerfilPilotoScreen --> Usuario: Mostrar perfil con estrella inactiva (vacía)
+end
+
+opt Usuario pulsa botón favorito
+    Usuario -> PerfilPilotoScreen: Tocar estrella
+    PerfilPilotoScreen -> LocalStorageManager: esFavorito(driverId)
+    LocalStorageManager --> PerfilPilotoScreen: Estado actual
+    
+    alt Piloto no es favorito
+        PerfilPilotoScreen -> LocalStorageManager: guardarFavorito(driverId)
+        LocalStorageManager --> PerfilPilotoScreen: Confirmación (reemplaza anterior)
+        PerfilPilotoScreen --> Usuario: Mostrar "Agregado a favoritos" y estrella activa
+    else Piloto ya es favorito
+        PerfilPilotoScreen -> LocalStorageManager: eliminarFavorito(driverId)
+        LocalStorageManager --> PerfilPilotoScreen: Confirmación
+        PerfilPilotoScreen --> Usuario: Mostrar "Favorito eliminado" y estrella inactiva
+    end
+end
+@enduml
+

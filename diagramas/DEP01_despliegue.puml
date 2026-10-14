@@ -1,0 +1,43 @@
+@startuml DEP01_despliegue
+node "Smartphone Android\n(Android 7.0+ / API 24+)" {
+    artifact "F1Fan APK / AAB\n(React Native + Expo)" as AndroidApp
+    database "AsyncStorage\n(SQLite interno)" as AndroidStorage
+    component "ARCore" as ARCoreEngine
+}
+
+node "Smartphone iOS\n(iPhone iOS 15.1+)" {
+    artifact "F1Fan iOS App\n(React Native + Expo)" as iOSApp
+    database "AsyncStorage / Keychain" as iOSStorage
+    component "ARKit" as ARKitEngine
+}
+
+node "Navegador Web\n(Chrome / Safari / Edge)" {
+    artifact "Bundle JS Web\n(Expo Web en Vercel CDN)" as WebPanel
+}
+
+cloud "Supabase Cloud\n(Región sa-east-1, São Paulo)" {
+    node "API Gateway (Kong)" as Kong
+    node "Deno Edge Runtime" as EdgeRuntime {
+        component "openf1-proxy" as EdgeProxy
+        component "sync-openf1" as EdgeSync
+    }
+    database "Servidor PostgreSQL 15\n(pg_cron, pg_net)" as SupabaseDB
+    node "Supabase Auth (GoTrue)" as AuthServer
+}
+
+cloud "api.openf1.org" {
+    component "OpenF1 REST API" as OpenF1API
+}
+
+AndroidApp --> Kong: HTTPS / REST + JWT
+iOSApp --> Kong: HTTPS / REST + JWT
+WebPanel --> Kong: HTTPS / REST + JWT
+
+Kong --> EdgeRuntime
+Kong --> SupabaseDB
+Kong --> AuthServer
+
+EdgeProxy --> OpenF1API: HTTPS GET
+EdgeSync --> OpenF1API: HTTPS GET
+@enduml
+

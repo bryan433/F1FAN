@@ -1,0 +1,37 @@
+@startuml SD07_circuito_realidad_aumentada
+actor Usuario
+participant ARScreen
+participant ARService
+participant "ARCore / ARKit" as ARNative
+participant OpenF1Client
+participant "API OpenF1" as OpenF1
+
+Usuario -> ARScreen: Tocar "Ver circuito en RA"
+ARScreen -> ARService: verificarSoporteRA()
+ARService -> ARNative: isARSupported()
+ARNative --> ARService: true (compatible)
+ARService --> ARScreen: Compatible
+ARScreen -> ARNative: Solicitar permiso de cámara
+ARNative --> ARScreen: Permiso concedido
+
+Usuario -> ARScreen: Mover teléfono para detectar superficie
+ARNative --> ARScreen: Plano horizontal detectado
+Usuario -> ARScreen: Ajustar escala (1:100) y pulsar "COLOCAR CIRCUITO"
+ARScreen -> ARScreen: Renderizar pista 3D sobre la mesa
+
+opt Replay de carrera y telemetría
+    ARScreen -> OpenF1Client: getLocation(sessionKey, driverNumber)
+    OpenF1Client -> OpenF1: GET /location?session_key={id}
+    OpenF1 --> OpenF1Client: Coordenadas x, y, z
+    OpenF1Client --> ARScreen: Puntos de trazado
+    loop Cada 270 ms
+        ARScreen -> ARScreen: Actualizar posición de autos y telemetría (velocidad, DRS)
+    end
+end
+
+opt Grabación de clip
+    Usuario -> ARScreen: Tocar "Grabar clip AR"
+    ARScreen --> Usuario: Grabando clip y guardando en galería
+end
+@enduml
+

@@ -1,0 +1,39 @@
+@startuml SD01_carga_inicial
+actor Usuario
+participant HomeScreen
+participant LocalStorageManager
+participant F1DataService
+participant OpenF1Client
+participant "API OpenF1" as OpenF1
+
+Usuario -> HomeScreen: Abrir aplicación
+HomeScreen -> LocalStorageManager: obtenerFavoritos()
+LocalStorageManager --> HomeScreen: Lista de favoritos
+HomeScreen -> LocalStorageManager: obtenerCache("proximoGP")
+LocalStorageManager --> HomeScreen: Datos almacenados / null
+
+alt Cache válido (menos de 6 horas)
+    HomeScreen -> HomeScreen: Procesar próximo Gran Premio
+else Cache inexistente o desactualizado
+    HomeScreen -> F1DataService: getNextRace()
+    F1DataService -> OpenF1Client: getMeetings(2024)
+    OpenF1Client -> OpenF1: GET /meetings
+    OpenF1 --> OpenF1Client: HTTP 200 OK + JSON
+    OpenF1Client --> F1DataService: Lista de Grandes Premios
+    F1DataService -> F1DataService: Identificar próximo GP
+    F1DataService -> LocalStorageManager: guardarCache("proximoGP", datos)
+    LocalStorageManager --> F1DataService: Confirmación
+    F1DataService --> HomeScreen: Datos del próximo GP
+else Error de red / timeout
+    OpenF1Client --> F1DataService: Error de conexión
+    F1DataService -> LocalStorageManager: obtenerUltimaCopiaCache("proximoGP")
+    LocalStorageManager --> F1DataService: Últimos datos disponibles
+    opt Existe caché anterior
+        HomeScreen -> HomeScreen: Activar modo sin conexión
+    end
+end
+
+HomeScreen -> HomeScreen: Calcular tiempo restante (hora Chile)
+HomeScreen --> Usuario: Mostrar próxima carrera con cuenta regresiva
+@enduml
+

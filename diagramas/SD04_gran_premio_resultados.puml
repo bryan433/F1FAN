@@ -1,0 +1,44 @@
+@startuml SD04_gran_premio_resultados
+actor Usuario
+participant CalendarioScreen
+participant DetalleGPScreen
+participant F1DataService
+participant OpenF1Client
+participant "API OpenF1" as OpenF1
+
+Usuario -> CalendarioScreen: Abrir calendario
+CalendarioScreen -> F1DataService: getCalendar(2024)
+F1DataService --> CalendarioScreen: Lista de Grandes Premios con hora local de Chile
+CalendarioScreen --> Usuario: Mostrar calendario
+Usuario -> CalendarioScreen: Seleccionar Gran Premio
+CalendarioScreen -> DetalleGPScreen: Abrir detalle (meetingId)
+
+DetalleGPScreen -> F1DataService: getSessions(meetingId)
+F1DataService -> OpenF1Client: getSessions(meetingId)
+OpenF1Client -> OpenF1: GET /sessions?meeting_key={id}
+OpenF1 --> OpenF1Client: HTTP 200 OK + JSON
+OpenF1Client --> F1DataService: Lista de sesiones
+F1DataService --> DetalleGPScreen: Lista de sesiones (Prácticas, Clasificación, Carrera)
+DetalleGPScreen --> Usuario: Mostrar sesiones con hora chilena (CLT)
+
+Usuario -> DetalleGPScreen: Seleccionar sesión
+DetalleGPScreen -> F1DataService: getSessionResults(sessionId)
+F1DataService -> OpenF1Client: getSessionResults(sessionId)
+OpenF1Client -> OpenF1: GET /session_result?session_key={id}
+
+alt Sesión disputada con resultados
+    OpenF1 --> OpenF1Client: JSON con resultados
+    OpenF1Client --> F1DataService: Resultados
+    loop Por cada resultado
+        F1DataService -> F1DataService: Asociar piloto, posición y tiempo
+    end
+    F1DataService --> DetalleGPScreen: Mostrar resultados
+    DetalleGPScreen --> Usuario: Mostrar podio y tabla de tiempos
+else Sesión no disputada
+    OpenF1 --> OpenF1Client: Respuesta vacía []
+    OpenF1Client --> F1DataService: Sin resultados
+    F1DataService --> DetalleGPScreen: Sesión programada
+    DetalleGPScreen --> Usuario: Mostrar aviso "Sesión aún no disputada" sin cortar navegación
+end
+@enduml
+

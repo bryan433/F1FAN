@@ -1,0 +1,32 @@
+@startuml SD06_sincronizacion_programada
+participant "pg_cron\n(Supabase)" as Cron
+participant "Edge Function\nsync-openf1" as EdgeSync
+participant "API OpenF1" as OpenF1
+database "PostgreSQL\n(Supabase)" as DB
+
+Cron -> EdgeSync: Invocar cada lunes 06:00 (hora Chile)
+EdgeSync -> DB: INSERT sync_log (estado: "en_proceso")
+EdgeSync -> OpenF1: GET /meetings?year=2024
+OpenF1 --> EdgeSync: Lista de Grandes Premios
+EdgeSync -> DB: UPSERT gran_premio y circuito
+
+loop Por cada Gran Premio disputado y no sincronizado
+    EdgeSync -> OpenF1: GET /sessions?meeting_key={id}
+    OpenF1 --> EdgeSync: Sesiones del fin de semana
+    EdgeSync -> DB: UPSERT sesion
+
+    loop Por cada sesión
+        EdgeSync -> OpenF1: GET /session_result?session_key={id}
+        OpenF1 --> EdgeSync: Resultados de la sesión
+        EdgeSync -> DB: UPSERT resultado_sesion
+        EdgeSync -> EdgeSync: Esperar 2.1 s (RNF-02: < 30 peticiones/min)
+    end
+end
+
+EdgeSync -> OpenF1: GET /drivers?session_key=latest
+OpenF1 --> EdgeSync: Pilotos y escuderías
+EdgeSync -> DB: UPSERT piloto y escuderia
+
+EdgeSync -> DB: UPDATE sync_log (estado: "ok", registros_actualizados)
+@enduml
+

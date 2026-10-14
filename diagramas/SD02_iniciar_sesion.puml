@@ -1,0 +1,33 @@
+@startuml SD02_iniciar_sesion
+actor Usuario
+participant LoginScreen
+participant AuthService
+participant "Supabase Auth\n(GoTrue)" as SupabaseAuth
+participant LocalStorageManager
+participant SecureStore
+
+Usuario -> LoginScreen: Ingresar correo y contraseña
+LoginScreen -> LoginScreen: Validar formato de los campos
+
+alt Credenciales correctas
+    LoginScreen -> AuthService: iniciarSesion(correo, clave)
+    AuthService -> SupabaseAuth: POST /auth/v1/token?grant_type=password
+    SupabaseAuth --> AuthService: 200 OK (access_token, refresh_token, user)
+    AuthService -> SecureStore: Guardar sesión cifrada
+    AuthService -> LocalStorageManager: obtenerFavoritos()
+    LocalStorageManager --> AuthService: Favoritos guardados como invitado
+    opt Hay favoritos locales sin subir
+        AuthService -> SupabaseAuth: Subir favoritos locales a la cuenta
+    end
+    AuthService --> LoginScreen: Sesión iniciada
+    LoginScreen --> Usuario: Navegar a HomeScreen
+else Credenciales incorrectas
+    SupabaseAuth --> AuthService: 400 invalid_grant
+    AuthService --> LoginScreen: Error de autenticación
+    LoginScreen --> Usuario: Mostrar "Correo o contraseña incorrectos"
+else Usuario elige "Explorar como invitado"
+    Usuario -> LoginScreen: Tocar "Explorar como invitado"
+    LoginScreen --> Usuario: Navegar a HomeScreen (favoritos sólo en el celular)
+end
+@enduml
+

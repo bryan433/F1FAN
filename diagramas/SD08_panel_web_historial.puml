@@ -1,0 +1,24 @@
+@startuml SD08_panel_web_historial
+actor "Usuario / Evaluador" as User
+participant HistorialWebScreen
+participant F1DataService
+participant LocalStorageManager
+
+User -> HistorialWebScreen: Ingresar a Historial de Carreras (Web / Móvil)
+HistorialWebScreen -> F1DataService: getCalendar(2024)
+F1DataService -> LocalStorageManager: obtenerCache("calendar_2024")
+LocalStorageManager --> F1DataService: Carreras históricas
+F1DataService --> HistorialWebScreen: Lista de carreras con ganador y pole
+HistorialWebScreen --> User: Mostrar tabla histórica de la temporada
+
+User -> HistorialWebScreen: Seleccionar otra temporada (ej: 2023)
+HistorialWebScreen -> HistorialWebScreen: Cambiar estado local a temporada 2023
+HistorialWebScreen --> User: Mostrar carreras de 2023
+
+opt Filtrar por piloto en el navegador
+    User -> HistorialWebScreen: Escribir "Leclerc" en el buscador
+    HistorialWebScreen -> HistorialWebScreen: Filtrar en memoria local (sin peticiones adicionales)
+    HistorialWebScreen --> User: Mostrar sólo carreras donde Leclerc ganó o hizo pole
+end
+@enduml
+

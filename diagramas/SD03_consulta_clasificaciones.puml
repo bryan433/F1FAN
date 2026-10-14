@@ -1,0 +1,49 @@
+@startuml SD03_consulta_clasificaciones
+actor Usuario
+participant ClasificacionScreen
+participant LocalStorageManager
+participant F1DataService
+participant OpenF1Client
+participant "API OpenF1" as OpenF1
+
+Usuario -> ClasificacionScreen: Abrir clasificación
+ClasificacionScreen -> Usuario: Mostrar opciones (Pilotos / Constructores)
+Usuario -> ClasificacionScreen: Seleccionar tipo de clasificación
+ClasificacionScreen -> LocalStorageManager: obtenerCache(tipo)
+LocalStorageManager --> ClasificacionScreen: Datos / null
+
+alt Caché válido (< 1 hora)
+    ClasificacionScreen -> ClasificacionScreen: Ordenar datos por posición
+else Caché inexistente o desactualizado
+    alt Clasificación de pilotos
+        ClasificacionScreen -> F1DataService: getDriverStandings()
+        F1DataService -> OpenF1Client: getDriverStandings()
+        OpenF1Client -> OpenF1: GET /championship_drivers
+        OpenF1 --> OpenF1Client: HTTP 200 OK + JSON
+    else Clasificación de constructores
+        ClasificacionScreen -> F1DataService: getTeamStandings()
+        F1DataService -> OpenF1Client: getTeamStandings()
+        OpenF1Client -> OpenF1: GET /championship_teams
+        OpenF1 --> OpenF1Client: HTTP 200 OK + JSON
+    end
+    OpenF1Client --> F1DataService: Datos de clasificación
+    loop Por cada registro
+        F1DataService -> F1DataService: Procesar posición, puntos, piloto/equipo
+    end
+    F1DataService -> LocalStorageManager: guardarCache(tipo, datos)
+    LocalStorageManager --> F1DataService: Confirmación
+    F1DataService --> ClasificacionScreen: Lista ordenada
+else Error / timeout
+    F1DataService -> LocalStorageManager: obtenerUltimaCopiaCache(tipo)
+    LocalStorageManager --> F1DataService: Datos previos / null
+    opt Existen datos anteriores
+        ClasificacionScreen -> ClasificacionScreen: Activar modo sin conexión
+    end
+end
+
+ClasificacionScreen -> LocalStorageManager: obtenerFavoritos()
+LocalStorageManager --> ClasificacionScreen: ID piloto favorito
+ClasificacionScreen -> ClasificacionScreen: Destacar fila del favorito con estrella
+ClasificacionScreen --> Usuario: Mostrar tabla de clasificación
+@enduml
+
