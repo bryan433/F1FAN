@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
 import { Colors } from '../theme/colors';
 import LocalStorageManager from '../storage/LocalStorageManager';
 import F1DataService from '../services/F1DataService';
@@ -68,8 +68,17 @@ export default function PerfilPilotoScreen({ route, navigation }) {
         {/* Banner Hero del Piloto con color de escudería */}
         <View style={[styles.heroCard, { borderColor: driver.colorHex || Colors.accentCyan }]}>
           <View style={styles.heroTop}>
-            <View style={[styles.numberCircle, { backgroundColor: driver.colorHex || Colors.accentCyan }]}>
-              <Text style={styles.numberLarge}>{driver.numero}</Text>
+            <View style={styles.heroLeftBlock}>
+              <View style={[styles.numberCircle, { backgroundColor: driver.colorHex || Colors.accentCyan }]}>
+                <Text style={styles.numberLarge}>{driver.numero}</Text>
+              </View>
+              {driver.urlFoto ? (
+                <Image
+                  source={{ uri: driver.urlFoto }}
+                  style={styles.driverAvatarImg}
+                  resizeMode="contain"
+                />
+              ) : null}
             </View>
             <View style={styles.countryBadge}>
               <Text style={styles.countryFlag}>{driver.bandera || '🏁'}</Text>
@@ -195,6 +204,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  heroLeftBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  driverAvatarImg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.backgroundDark,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   numberCircle: {
     width: 44,
