@@ -50,3 +50,4 @@ describe('Modelo Circuito', () => {
     expect(circuito.mapaUrl).toBe('https://example.com/monza.png');
   });
 });
+

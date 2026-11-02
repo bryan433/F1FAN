@@ -40,3 +40,4 @@ describe('Header component', () => {
     expect(onProfilePressMock).toHaveBeenCalledTimes(1);
   });
 });
+

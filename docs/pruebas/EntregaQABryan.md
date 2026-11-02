@@ -141,3 +141,4 @@ npm run test:unit:coverage
 # 3. Ejecutar la suite completa simulando el agente de CI
 npm run test:ci
 ```
+
