@@ -136,13 +136,4 @@ Dentro de la carpeta `F1FAN`:
 ```bash
 # Iniciar servidor de desarrollo Expo
 npx expo start
-
-# Ejecutar en el navegador web (Expo Web)
-npx expo start --web
-
-# Ejecutar en dispositivo Android (o emulador)
-npx expo start --android
-
-# Ejecutar en iOS (o simulador en macOS)
-npx expo start --ios
 ```
