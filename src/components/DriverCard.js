@@ -34,11 +34,11 @@ export default function DriverCard({ driver, position, onPress, onToggleFavorite
       </View>
 
       <View style={styles.numberBox}>
-        <Text style={styles.driverNumber}>{driver.numero}</Text>
+        <Text style={styles.driverNumber}>{driver.numero ?? 'No disponible'}</Text>
       </View>
 
       <View style={styles.pointsContainer}>
-        <Text style={styles.pointsText}>{driver.puntos}</Text>
+        <Text style={styles.pointsText}>{driver.puntos ?? 'No disponible'}</Text>
         <Text style={styles.pointsUnit}>PTS</Text>
       </View>
 

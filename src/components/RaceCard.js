@@ -4,9 +4,9 @@ import { Colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function RaceCard({ race, onPress, onLivePress }) {
-  const isLive = Boolean(race.isLive);
+  const isLive = race.isLive === true || race.estado === 'En curso';
   const isNext = Boolean(race.isNext);
-  const isFinished = race.status === 'Finalizado';
+  const isFinished = race.estado === 'Finalizado' || race.status === 'Finalizado';
 
   return (
     <TouchableOpacity
@@ -16,40 +16,41 @@ export default function RaceCard({ race, onPress, onLivePress }) {
         isLive && styles.cardLive
       ]}
       onPress={onPress}
+      accessibilityRole="button"
       activeOpacity={0.8}
     >
       <View style={styles.topRow}>
         <View style={styles.countryInfo}>
           <Text style={styles.flag}>{race.flag || '🏁'}</Text>
           <View>
-            <Text style={styles.country}>{race.country || race.pais}</Text>
-            <Text style={styles.round}>ROUND {race.round}</Text>
+            <Text style={styles.country}>{race.country || race.pais || 'País no disponible'}</Text>
+            <Text style={styles.round}>{race.round != null ? `ROUND ${race.round}` : 'Ronda no disponible'}</Text>
           </View>
         </View>
 
         {isLive ? (
-          <TouchableOpacity style={styles.liveButton} onPress={onLivePress}>
+          <TouchableOpacity accessibilityRole="button" style={styles.liveButton} onPress={onLivePress}>
             <View style={styles.pulseDot} />
             <Text style={styles.liveBtnText}>ENTRAR AL LIVE</Text>
           </TouchableOpacity>
         ) : isFinished ? (
           <View style={styles.winnerBadge}>
-            <Text style={styles.winnerText}>Ganador: {race.winner || 'VER'}</Text>
+            <Text style={styles.winnerText}>{race.winner ? `Ganador: ${race.winner}` : 'Resultado no disponible'}</Text>
           </View>
         ) : (
           <View style={styles.upcomingBadge}>
-            <Text style={styles.upcomingText}>{race.localChileHour || '09:00 CLT'}</Text>
+            <Text style={styles.upcomingText}>{race.localChileHour || 'Hora por confirmar'}</Text>
           </View>
         )}
       </View>
 
-      <Text style={styles.raceName}>{race.name || race.nombreOficial}</Text>
-      <Text style={styles.circuitName}>{race.circuit || (race.circuito && race.circuito.nombreCircuito)}</Text>
+      <Text style={styles.raceName}>{race.name || race.nombreOficial || race.nombreCorto || 'Nombre del GP no disponible'}</Text>
+      <Text style={styles.circuitName}>{race.circuit || race.circuito?.nombreCircuito || 'Circuito no disponible'}</Text>
 
       <View style={styles.footerRow}>
         <View style={styles.dateRow}>
           <Ionicons name="calendar-outline" size={13} color={Colors.textSecondary} style={{ marginRight: 4 }} />
-          <Text style={styles.dateText}>{race.dateRange || '20 - 22 Sep'}</Text>
+          <Text style={styles.dateText}>{race.dateRange || 'Fecha por confirmar'}</Text>
         </View>
         <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
       </View>

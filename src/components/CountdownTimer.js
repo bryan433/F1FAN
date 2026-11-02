@@ -4,31 +4,39 @@ import { Colors } from '../theme/colors';
 import { calculateTimeRemaining } from '../utils/timezone';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function CountdownTimer({ targetDate, onCalendarPress, round = 17, totalRounds = 24, location = 'MARINA BAY' }) {
+export default function CountdownTimer({ targetDate, onCalendarPress, round, totalRounds, location, country, title = 'Próximo Gran Premio' }) {
   const [timeRemaining, setTimeRemaining] = useState(calculateTimeRemaining(targetDate));
+  const hasTarget = Boolean(targetDate) && Number.isFinite(new Date(targetDate).getTime());
 
   useEffect(() => {
+    setTimeRemaining(calculateTimeRemaining(targetDate));
+    if (!hasTarget || new Date(targetDate).getTime() <= Date.now()) return;
     const timer = setInterval(() => {
-      setTimeRemaining(calculateTimeRemaining(targetDate));
+      const remaining = calculateTimeRemaining(targetDate);
+      setTimeRemaining(remaining);
+      if (remaining.isPassed) clearInterval(timer);
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [targetDate]);
+  }, [targetDate, hasTarget]);
 
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
         <View style={styles.badgeRow}>
-          <Text style={styles.badgeText}>SINGAPUR</Text>
-          <Text style={styles.dotSeparator}>•</Text>
-          <Text style={styles.locationText}>{location}</Text>
+          {country ? <Text style={styles.badgeText}>{country}</Text> : null}
+          {country && location ? <Text style={styles.dotSeparator}>•</Text> : null}
+          {location ? <Text style={styles.locationText}>{location}</Text> : null}
         </View>
-        <Text style={styles.roundText}>Round {round} de {totalRounds}</Text>
+        {round != null && (
+          <Text style={styles.roundText}>Round {round}{totalRounds != null ? ` de ${totalRounds}` : ''}</Text>
+        )}
       </View>
 
-      <Text style={styles.title}>GRAN PREMIO DE SINGAPUR</Text>
+      <Text style={styles.title}>{title}</Text>
 
-      <View style={styles.timerRow}>
+      {hasTarget && !timeRemaining.isPassed ? (
+      <View style={styles.timerRow} accessibilityLabel="Cuenta regresiva para la carrera">
         <View style={styles.timeBox}>
           <Text style={styles.timeNumber}>{String(timeRemaining.days).padStart(2, '0')}</Text>
           <Text style={styles.timeUnit}>días</Text>
@@ -48,7 +56,15 @@ export default function CountdownTimer({ targetDate, onCalendarPress, round = 17
           <Text style={styles.timeUnit}>min</Text>
         </View>
 
-        <TouchableOpacity style={styles.calendarBtn} onPress={onCalendarPress} activeOpacity={0.8}>
+      </View>
+      ) : (
+        <Text style={styles.locationText}>
+          {hasTarget ? 'Inicio programado alcanzado. Estado real sin confirmar.' : 'Fecha y hora por confirmar.'}
+        </Text>
+      )}
+
+      <View style={styles.timerRow}>
+        <TouchableOpacity accessibilityRole="button" style={styles.calendarBtn} onPress={onCalendarPress} activeOpacity={0.8}>
           <Ionicons name="calendar-outline" size={16} color={Colors.textPrimary} style={{ marginRight: 4 }} />
           <Text style={styles.calendarBtnText}>+ Calendario</Text>
         </TouchableOpacity>

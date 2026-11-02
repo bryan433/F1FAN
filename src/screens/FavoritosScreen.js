@@ -1,74 +1,139 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { Colors } from '../theme/colors';
 import Header from '../components/Header';
 import LocalStorageManager from '../storage/LocalStorageManager';
-import { DRIVERS, TEAMS } from '../data/teamsAndDrivers';
+import F1DataService from '../services/F1DataService';
+import { resolveDriverFavorites, resolveTeamFavorites } from '../utils/favorites';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function FavoritosScreen({ navigation }) {
-  const [favoriteDriverIds, setFavoriteDriverIds] = useState([63]);
-  const [favoriteTeams, setFavoriteTeams] = useState(['mercedes', 'mclaren']);
+  const [favoriteRecords, setFavoriteRecords] = useState([]);
+  const [favoriteTeams, setFavoriteTeams] = useState([]);
+  const [catalog, setCatalog] = useState({ drivers: [], teams: [] });
+  const [loading, setLoading] = useState(true);
+  const [lookupWarning, setLookupWarning] = useState(false);
   const [alerts, setAlerts] = useState({
-    boxes: true,
-    radio: true,
-    safetyCar: true,
-    leaderChange: false,
+    boxes: true, radio: true, safetyCar: true, leaderChange: false,
   });
+  const mounted = useRef(true);
+  const inFlight = useRef(null);
+  const preferenceRequest = useRef(0);
 
-  useEffect(() => {
-    const loadFavs = async () => {
-      const favs = await LocalStorageManager.obtenerFavoritos();
-      if (favs.length > 0) setFavoriteDriverIds(favs);
-      const teams = await LocalStorageManager.obtenerEscuderiasFavoritas();
-      if (teams.length > 0) setFavoriteTeams(teams);
-      const savedAlerts = await LocalStorageManager.obtenerAlertas();
-      if (savedAlerts) setAlerts(prev => ({ ...prev, ...savedAlerts }));
-    };
-    loadFavs();
+  const loadPreferences = useCallback(async () => {
+    const request = ++preferenceRequest.current;
+    const [records, teams] = await Promise.all([
+      LocalStorageManager.obtenerDetalleFavoritos(), LocalStorageManager.obtenerEscuderiasFavoritas(),
+    ]);
+    if (mounted.current && request === preferenceRequest.current) {
+      setFavoriteRecords(records);
+      setFavoriteTeams(teams);
+    }
   }, []);
 
-  const toggleAlert = async (key) => {
+  const loadFavs = useCallback(() => {
+    if (inFlight.current) return inFlight.current;
+    const promise = (async () => {
+      const [, savedAlerts] = await Promise.all([loadPreferences(), LocalStorageManager.obtenerAlertas()]);
+      if (!mounted.current) return;
+      setAlerts(prev => ({ ...prev, ...savedAlerts }));
+      try {
+        // Reutiliza el servicio/caché existentes; no transforma clasificaciones ni sus cifras.
+        const standings = await F1DataService.getChampionshipStandings();
+        if (mounted.current) {
+          setCatalog({ drivers: standings.drivers.data, teams: standings.teams.data });
+          setLookupWarning(Boolean(standings.drivers.error || standings.teams.error));
+        }
+      } catch {
+        if (mounted.current) {
+          setCatalog({ drivers: [], teams: [] });
+          setLookupWarning(true);
+        }
+      }
+      // Si cambió una preferencia mientras se resolvía la consulta, gana lo persistido.
+      await loadPreferences();
+    })().finally(() => {
+      inFlight.current = null;
+      if (mounted.current) setLoading(false);
+    });
+    inFlight.current = promise;
+    return promise;
+  }, [loadPreferences]);
+
+  useEffect(() => {
+    mounted.current = true;
+    loadFavs();
+    const unsubscribe = navigation.addListener('focus', loadFavs);
+    const unsubscribePreferences = LocalStorageManager.suscribirFavoritos(loadPreferences);
+    return () => { mounted.current = false; unsubscribe(); unsubscribePreferences(); };
+  }, [navigation, loadFavs, loadPreferences]);
+
+  const toggleAlert = async key => {
     const updated = { ...alerts, [key]: !alerts[key] };
     setAlerts(updated);
     await LocalStorageManager.guardarAlertas(updated);
   };
 
-  const removeFavDriver = async (id) => {
-    await LocalStorageManager.eliminarFavorito(id);
-    setFavoriteDriverIds(favoriteDriverIds.filter(f => String(f) !== String(id)));
+  const removeFavDriver = async driver => {
+    if (!await LocalStorageManager.eliminarFavorito(driver.savedIds)) {
+      Alert.alert('No se pudo eliminar el favorito', 'La preferencia guardada se conserva.');
+      await loadPreferences();
+      return;
+    }
+    await loadPreferences();
     Alert.alert('Favorito eliminado', 'Se actualizó tu lista de pilotos destacados.');
   };
 
-  const favoriteDrivers = DRIVERS.filter(d => favoriteDriverIds.includes(d.idPiloto) || d.idPiloto === 63);
+  const removeFavTeam = async id => {
+    await LocalStorageManager.toggleEscuderiaFavorita(id);
+    await loadPreferences();
+  };
+
+  const openStandings = () => navigation.navigate('MainTabs', { screen: 'Tablas' });
+  const goBack = () => {
+    if (navigation.canGoBack?.()) navigation.goBack();
+    else navigation.navigate('MainTabs', { screen: 'Más' });
+  };
+  const favoriteDrivers = resolveDriverFavorites(favoriteRecords, catalog.drivers);
+  const favoriteTeamItems = resolveTeamFavorites(favoriteTeams, catalog.teams);
 
   return (
     <View style={styles.container}>
-      <Header
-        subtitle="CENTRO DE PREFERENCIAS"
-        title="Favoritos"
-        onProfilePress={() => navigation.navigate('Perfil')}
-      />
+      <View style={styles.headerRow}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver"
+          accessibilityHint="Regresa a la pantalla anterior o a Más" onPress={goBack}
+          style={styles.backButton}>
+          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <Header subtitle="CENTRO DE PREFERENCIAS" title="Favoritos"
+            onProfilePress={() => navigation.navigate('Perfil')} />
+        </View>
+      </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {loading && <Text style={styles.favSub}>Cargando favoritos...</Text>}
+        {lookupWarning && <Text style={styles.favSub}>No se pudo actualizar la información de clasificación. Tus favoritos guardados se conservan.</Text>}
         {/* SECCIÓN 1: PILOTOS FAVORITOS (Mockup 12) */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>PILOTOS FAVORITOS</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Clasificacion')}>
+          <TouchableOpacity accessibilityLabel="Añadir piloto favorito" onPress={openStandings}>
             <Text style={styles.headerAction}>+ Añadir</Text>
           </TouchableOpacity>
         </View>
 
+        {!loading && !favoriteDrivers.length && <Text style={styles.favSub}>No tienes pilotos favoritos guardados.</Text>}
         {favoriteDrivers.map((driver) => (
-          <View key={driver.idPiloto} style={styles.favItemCard}>
-            <View style={[styles.dorsalCircle, { backgroundColor: driver.colorHex }]}>
-              <Text style={styles.dorsalText}>{driver.numero}</Text>
+          <View key={driver.key} style={styles.favItemCard}>
+            <View style={[styles.dorsalCircle, { backgroundColor: driver.color }]}>
+              <Text style={styles.dorsalText}>{driver.number}</Text>
             </View>
             <View style={styles.favDetails}>
-              <Text style={styles.favName}>{driver.nombre} {driver.apellido}</Text>
-              <Text style={styles.favSub}>{driver.teamName} • P{driver.posicionCampeonato} ({driver.puntos} pts)</Text>
+              <Text style={styles.favName}>{driver.name}</Text>
+              <Text style={styles.favSub}>{driver.subtitle}</Text>
             </View>
-            <TouchableOpacity onPress={() => removeFavDriver(driver.idPiloto)} style={styles.starAction}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Quitar piloto favorito ${driver.name}`}
+              onPress={() => removeFavDriver(driver)} style={styles.starAction}>
               <Ionicons name="star" size={20} color={Colors.accentYellow} />
             </TouchableOpacity>
           </View>
@@ -77,16 +142,21 @@ export default function FavoritosScreen({ navigation }) {
         {/* SECCIÓN 2: ESCUDERÍAS FAVORITAS (Mockup 12) */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>ESCUDERÍAS FAVORITAS</Text>
-          <TouchableOpacity onPress={() => Alert.alert('Escuderías', 'Selecciona escuderías en la sección de tablas.')}>
+          <TouchableOpacity accessibilityLabel="Elegir escuderías favoritas" onPress={openStandings}>
             <Text style={styles.headerAction}>+ Añadir</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.teamsChipRow}>
-          {TEAMS.filter(t => favoriteTeams.includes(t.id)).map((team) => (
-            <View key={team.id} style={[styles.teamChip, { borderColor: team.colorHex }]}>
-              <View style={[styles.chipDot, { backgroundColor: team.colorHex }]} />
+          {!loading && !favoriteTeamItems.length && <Text style={styles.favSub}>No tienes escuderías favoritas guardadas.</Text>}
+          {favoriteTeamItems.map((team) => (
+            <View key={team.id} style={[styles.teamChip, { borderColor: team.color }]}>
+              <View style={[styles.chipDot, { backgroundColor: team.color }]} />
               <Text style={styles.chipText}>{team.name}</Text>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Quitar escudería favorita ${team.name}`}
+                onPress={() => removeFavTeam(team.id)} style={styles.starAction}>
+                <Ionicons name="close" size={16} color={Colors.textSecondary} />
+              </TouchableOpacity>
             </View>
           ))}
         </View>
@@ -167,6 +237,20 @@ export default function FavoritosScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerContent: {
+    flex: 1,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    marginLeft: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   container: {
     flex: 1,
     backgroundColor: Colors.background,

@@ -1,38 +1,67 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
 import { Colors } from '../theme/colors';
 import LocalStorageManager from '../storage/LocalStorageManager';
-import F1DataService from '../services/F1DataService';
+import { resolveDriverFavorites } from '../utils/favorites';
 import { Ionicons } from '@expo/vector-icons';
 import { DRIVERS } from '../data/teamsAndDrivers';
 
 export default function PerfilPilotoScreen({ route, navigation }) {
-  const driverParam = route.params?.driver;
-  const driverId = route.params?.driverId || (driverParam ? driverParam.idPiloto : 63);
+  const driverParam = route?.params?.driver;
+  const driverId = route?.params?.driverId ?? driverParam?.idPiloto ?? driverParam?.driverId ?? 63;
 
-  const [driver, setDriver] = useState(driverParam || DRIVERS.find(d => d.idPiloto === driverId) || DRIVERS[3]);
+  const driver = useMemo(() => driverParam || DRIVERS.find(d => String(d.idPiloto) === String(driverId))
+    || { idPiloto: driverId, nombre: 'Piloto', apellido: String(driverId) }, [driverParam, driverId]);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const busy = useRef(false);
+  const preferenceRequest = useRef(0);
+  const mounted = useRef(false);
+  const identity = driver.driverId ?? driver.idPiloto;
+  const isChampionship = driver.source === 'jolpica';
 
   useEffect(() => {
+    mounted.current = true;
     const checkFav = async () => {
-      const fav = await LocalStorageManager.esFavorito(driver.idPiloto);
-      setIsFavorite(fav);
+      const request = ++preferenceRequest.current;
+      const records = await LocalStorageManager.obtenerDetalleFavoritos();
+      const selected = resolveDriverFavorites(records, [driver]).some(entry => entry.current);
+      if (mounted.current && request === preferenceRequest.current) setIsFavorite(selected);
     };
     checkFav();
-  }, [driver.idPiloto]);
+    const unsubscribe = LocalStorageManager.suscribirFavoritos(checkFav);
+    const unsubscribeFocus = navigation.addListener?.('focus', checkFav);
+    return () => {
+      mounted.current = false;
+      preferenceRequest.current += 1;
+      unsubscribe();
+      unsubscribeFocus?.();
+    };
+  }, [driver, navigation]);
 
   /**
    * Flujo CU-06: Gestión de favoritos con AsyncStorage
    */
   const handleToggleFavorite = async () => {
-    if (isFavorite) {
-      await LocalStorageManager.eliminarFavorito(driver.idPiloto);
-      setIsFavorite(false);
-      Alert.alert('Favorito eliminado', `${driver.nombre} ${driver.apellido} eliminado de tus favoritos.`);
-    } else {
-      await LocalStorageManager.guardarFavorito(driver.idPiloto);
-      setIsFavorite(true);
-      Alert.alert('Agregado a favoritos', `${driver.nombre} ${driver.apellido} guardado como tu piloto favorito.`);
+    if (busy.current) return;
+    busy.current = true;
+    setSaving(true);
+    try {
+      const records = await LocalStorageManager.obtenerDetalleFavoritos();
+      const selected = resolveDriverFavorites(records, [driver]).find(entry => entry.current);
+      const success = selected
+        ? await LocalStorageManager.eliminarFavorito(selected.savedIds)
+        : await LocalStorageManager.guardarFavorito(driver.idPiloto ?? identity, driver);
+      if (!success) throw new Error('No se pudo actualizar la preferencia guardada.');
+      if (mounted.current) {
+        Alert.alert(selected ? 'Favorito eliminado' : 'Agregado a favoritos',
+          `${driver.nombre} ${driver.apellido || ''} ${selected ? 'eliminado de' : 'guardado en'} tus favoritos.`);
+      }
+    } catch (error) {
+      if (mounted.current) Alert.alert('No se pudo guardar el favorito', error.message);
+    } finally {
+      busy.current = false;
+      if (mounted.current) setSaving(false);
     }
   };
 
@@ -53,6 +82,9 @@ export default function PerfilPilotoScreen({ route, navigation }) {
         </TouchableOpacity>
         <Text style={styles.navTitle}>Perfil del Piloto</Text>
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={isFavorite ? 'Quitar piloto de favoritos' : 'Añadir piloto a favoritos'}
+          disabled={saving}
           style={[styles.favHeaderBtn, isFavorite && styles.favHeaderBtnActive]}
           onPress={handleToggleFavorite}
         >
@@ -65,15 +97,17 @@ export default function PerfilPilotoScreen({ route, navigation }) {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {!isChampionship && <Text style={[styles.sectionHeader, { margin: 16 }]}>PERFIL DE DEMOSTRACIÓN — ESTADÍSTICAS SIMULADAS</Text>}
         {/* Banner Hero del Piloto con color de escudería */}
         <View style={[styles.heroCard, { borderColor: driver.colorHex || Colors.accentCyan }]}>
           <View style={styles.heroTop}>
             <View style={styles.heroLeftBlock}>
               <View style={[styles.numberCircle, { backgroundColor: driver.colorHex || Colors.accentCyan }]}>
-                <Text style={styles.numberLarge}>{driver.numero}</Text>
+                <Text style={styles.numberLarge}>{driver.numero ?? '—'}</Text>
               </View>
               {driver.urlFoto ? (
                 <Image
+                  accessibilityLabel={`Foto de ${driver.nombre} ${driver.apellido || ''}`.trim()}
                   source={{ uri: driver.urlFoto }}
                   style={styles.driverAvatarImg}
                   resizeMode="contain"
@@ -91,6 +125,8 @@ export default function PerfilPilotoScreen({ route, navigation }) {
 
           {/* Botón interactivo de Favorito según Mockup 10 */}
           <TouchableOpacity
+            accessibilityRole="button"
+            disabled={saving}
             style={[styles.favActionBtn, isFavorite && styles.favActionBtnActive]}
             onPress={handleToggleFavorite}
             activeOpacity={0.8}
@@ -102,29 +138,29 @@ export default function PerfilPilotoScreen({ route, navigation }) {
               style={{ marginRight: 8 }}
             />
             <Text style={[styles.favActionText, isFavorite && styles.favActionTextActive]}>
-              {isFavorite ? 'ES TU PILOTO FAVORITO' : 'MARCAR COMO FAVORITO'}
+              {isFavorite ? 'EN TUS FAVORITOS' : 'MARCAR COMO FAVORITO'}
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* Estadísticas de la Temporada (Mockup 10) */}
         <View style={styles.statsSection}>
-          <Text style={styles.sectionHeader}>RENDIMIENTO EN EL CAMPEONATO 2024</Text>
+          <Text style={styles.sectionHeader}>{isChampionship ? `RENDIMIENTO EN EL CAMPEONATO ${driver.season ?? '—'}` : 'RENDIMIENTO DE DEMOSTRACIÓN'}</Text>
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>P{driver.posicionCampeonato || 4}</Text>
+              <Text style={styles.statValue}>{driver.posicionCampeonato != null ? `P${driver.posicionCampeonato}` : 'No disponible'}</Text>
               <Text style={styles.statLabel}>POSICIÓN</Text>
             </View>
             <View style={styles.statBox}>
-              <Text style={[styles.statValue, { color: Colors.accentYellow }]}>{driver.puntos}</Text>
+              <Text style={[styles.statValue, { color: Colors.accentYellow }]}>{driver.puntos ?? 'No disponible'}</Text>
               <Text style={styles.statLabel}>PUNTOS</Text>
             </View>
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>{driver.podios || 3}</Text>
+              <Text style={styles.statValue}>{driver.podios ?? 'No disponible'}</Text>
               <Text style={styles.statLabel}>PODIOS</Text>
             </View>
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>{driver.victorias || 1}</Text>
+              <Text style={styles.statValue}>{driver.victorias ?? 'No disponible'}</Text>
               <Text style={styles.statLabel}>VICTORIAS</Text>
             </View>
           </View>
@@ -132,8 +168,9 @@ export default function PerfilPilotoScreen({ route, navigation }) {
 
         {/* Historial de Carreras (Mockup 10) */}
         <View style={styles.historySection}>
-          <Text style={styles.sectionHeader}>HISTORIAL RECIENTE DE CARRERAS</Text>
-          {raceHistory.map((race, index) => (
+          <Text style={styles.sectionHeader}>{isChampionship ? 'HISTORIAL RECIENTE DE CARRERAS' : 'HISTORIAL DE DEMOSTRACIÓN — DATOS SIMULADOS'}</Text>
+          {isChampionship && <Text style={styles.raceStatus}>Historial reciente no disponible en esta clasificación.</Text>}
+          {!isChampionship && raceHistory.map((race, index) => (
             <View key={index} style={styles.historyRow}>
               <View style={styles.raceInfo}>
                 <Text style={styles.raceGp}>{race.gp}</Text>
