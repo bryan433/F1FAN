@@ -4,13 +4,22 @@ import { Colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function SessionCard({ session, onPress }) {
-  const isLive = session.esLive || session.estado === 'En curso';
-  const isFinished = session.estado === 'Finalizado';
+  const isLive = session.esLive === true || session.estado === 'En curso';
+  const isFinished = ['Finalizado', 'Finalizada'].includes(session.estado);
+  const isScheduled = ['Programado', 'Programada'].includes(session.estado);
+  const hasLap = Number.isInteger(session.vueltaActual) && session.vueltaActual >= 0;
+  const hasHour = typeof session.horaChile === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(session.horaChile);
+  const dateLabel = session.dia || (session.date ? `${session.date} (fecha UTC)` : null);
+  const timeLabel = hasHour ? `${session.horaChile} (Santiago)` : 'Hora por confirmar';
+  const scheduleLabel = dateLabel ? `${dateLabel} ${timeLabel}` : hasHour ? timeLabel : 'Fecha y hora por confirmar';
+  const stateLabel = isScheduled ? 'PROGRAMADA' : session.estado && session.estado !== 'Estado no confirmado'
+    ? session.estado : 'ESTADO NO CONFIRMADO';
 
   return (
     <TouchableOpacity
       style={[styles.card, isLive && styles.liveCard]}
       onPress={onPress}
+      accessibilityRole="button"
       activeOpacity={0.75}
     >
       <View style={styles.leftCol}>
@@ -23,15 +32,13 @@ export default function SessionCard({ session, onPress }) {
             </View>
           )}
         </View>
-        <Text style={styles.timeText}>
-          {session.dia || 'Hoy'} {session.horaChile || '12:00'} CLT
-        </Text>
+        <Text style={styles.timeText}>{scheduleLabel}</Text>
       </View>
 
       <View style={styles.rightCol}>
-        {isLive ? (
+        {isLive ? hasLap && (
           <View style={styles.badgeLive}>
-            <Text style={styles.badgeLiveText}>VUELTA {session.vueltaActual || 12}</Text>
+            <Text style={styles.badgeLiveText}>VUELTA {session.vueltaActual}</Text>
             <Ionicons name="chevron-forward" size={14} color={Colors.accentCyan} />
           </View>
         ) : isFinished ? (
@@ -40,7 +47,7 @@ export default function SessionCard({ session, onPress }) {
           </View>
         ) : (
           <View style={styles.badgeUpcoming}>
-            <Text style={styles.badgeUpcomingText}>{session.horaChile || '09:00'}</Text>
+            <Text style={styles.badgeUpcomingText}>{stateLabel}</Text>
           </View>
         )}
       </View>

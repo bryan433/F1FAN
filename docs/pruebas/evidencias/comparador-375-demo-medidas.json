@@ -1,0 +1,156 @@
+{
+  "viewport": 375,
+  "pageWidth": 375,
+  "metrics": [
+    {
+      "label": "PUNTOS TOTALES",
+      "title": {
+        "left": 33,
+        "right": 342,
+        "top": 314,
+        "bottom": 329,
+        "width": 309
+      },
+      "values": [
+        {
+          "text": "125.5",
+          "left": 33,
+          "right": 181.3125,
+          "top": 337,
+          "bottom": 357,
+          "width": 148.3125
+        },
+        {
+          "text": "100",
+          "left": 193.6875,
+          "right": 342,
+          "top": 337,
+          "bottom": 357,
+          "width": 148.3125
+        }
+      ],
+      "bars": [
+        {
+          "color": "rgb(0, 210, 190)",
+          "left": 33,
+          "right": 204.96875,
+          "top": 363,
+          "bottom": 371,
+          "width": 171.96875
+        },
+        {
+          "color": "rgb(255, 128, 0)",
+          "left": 204.96875,
+          "right": 342,
+          "top": 363,
+          "bottom": 371,
+          "width": 137.03125
+        }
+      ]
+    },
+    {
+      "label": "VICTORIAS",
+      "title": {
+        "left": 33,
+        "right": 342,
+        "top": 385,
+        "bottom": 400,
+        "width": 309
+      },
+      "values": [
+        {
+          "text": "3",
+          "left": 33,
+          "right": 181.3125,
+          "top": 408,
+          "bottom": 428,
+          "width": 148.3125
+        },
+        {
+          "text": "1",
+          "left": 193.6875,
+          "right": 342,
+          "top": 408,
+          "bottom": 428,
+          "width": 148.3125
+        }
+      ],
+      "bars": [
+        {
+          "color": "rgb(0, 210, 190)",
+          "left": 33,
+          "right": 264.75,
+          "top": 434,
+          "bottom": 442,
+          "width": 231.75
+        },
+        {
+          "color": "rgb(255, 128, 0)",
+          "left": 264.75,
+          "right": 342,
+          "top": 434,
+          "bottom": 442,
+          "width": 77.25
+        }
+      ]
+    },
+    {
+      "label": "POLE POSITIONS",
+      "title": {
+        "left": 33,
+        "right": 342,
+        "top": 456,
+        "bottom": 471,
+        "width": 309
+      },
+      "values": [
+        {
+          "text": "No disponible",
+          "left": 33,
+          "right": 181.3125,
+          "top": 479,
+          "bottom": 499,
+          "width": 148.3125
+        },
+        {
+          "text": "No disponible",
+          "left": 193.6875,
+          "right": 342,
+          "top": 479,
+          "bottom": 499,
+          "width": 148.3125
+        }
+      ],
+      "bars": []
+    },
+    {
+      "label": "PODIOS",
+      "title": {
+        "left": 33,
+        "right": 342,
+        "top": 519,
+        "bottom": 534,
+        "width": 309
+      },
+      "values": [
+        {
+          "text": "No disponible",
+          "left": 33,
+          "right": 181.3125,
+          "top": 542,
+          "bottom": 562,
+          "width": 148.3125
+        },
+        {
+          "text": "No disponible",
+          "left": 193.6875,
+          "right": 342,
+          "top": 542,
+          "bottom": 562,
+          "width": 148.3125
+        }
+      ],
+      "bars": []
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+Validaci?n del clon de integraci?n: 2026-11-02 (America/Santiago)
+Rama: feature/testing-plan-maestro
+Base: 239678735f29c854a3a2f9022714d0ce93b0a0ea
+Comando: npm.cmd test -- --config jest.unit.config.js --coverage --runInBand
+C?digo de salida observado: 0
+Salida completa de stdout/stderr del comando; red y AsyncStorage simulados por Jest.
+
+
+> f1fan@1.0.0 test
+> jest --config jest.unit.config.js --coverage --runInBand
+
+----------------------------|---------|----------|---------|---------|-----------------------
+File                        | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
+----------------------------|---------|----------|---------|---------|-----------------------
+All files                   |   85.71 |    84.41 |   87.81 |   85.71 |
+ components                 |   97.67 |    88.28 |   96.15 |   97.43 |
+  CountdownTimer.js         |     100 |    96.29 |     100 |     100 | 32
+  DriverCard.js             |     100 |      100 |     100 |     100 |
+  Header.js                 |       0 |        0 |       0 |       0 | 7-24
+  LoadingScreen.js          |     100 |      100 |     100 |     100 |
+  OfflineBanner.js          |     100 |      100 |     100 |     100 |
+  RaceCard.js               |     100 |    93.75 |     100 |     100 | 15,27
+  SessionCard.js            |     100 |    96.87 |     100 |     100 | 14
+  StandingsTable.js         |     100 |    89.33 |     100 |     100 | 59,89-100,105-108,115
+  TelemetryWidget.js        |     100 |       80 |     100 |     100 | 6-7,9
+  TrackMap.js               |     100 |    71.42 |     100 |     100 | 26,37,46,99-107
+ models                     |    70.1 |    73.61 |   69.23 |   69.47 |
+  Circuito.js               |       0 |        0 |       0 |       0 | 21-32
+  Escuderia.js              |     100 |      100 |     100 |     100 |
+  GranPremio.js             |     100 |      100 |     100 |     100 |
+  Piloto.js                 |     100 |      100 |     100 |     100 |
+  ResultadoSesion.js        |       0 |        0 |       0 |       0 | 18-62
+  Sesion.js                 |     100 |      100 |     100 |     100 |
+  index.js                  |       0 |        0 |       0 |       0 |
+ services                   |   84.25 |    83.38 |   82.29 |   83.88 |
+  AuthService.js            |       0 |        0 |       0 |       0 | 9-54
+  F1DataService.js          |   96.85 |    93.79 |   93.93 |   98.19 | 266-267
+  JolpicaCalendarAdapter.js |     100 |    80.23 |     100 |     100 | 30-38,47-48,56,66-76
+  JolpicaService.js         |   96.26 |    87.09 |     100 |    98.8 | 157
+  OpenF1Client.js           |    12.9 |        0 |    9.09 |   13.79 | 20-110
+ storage                    |   97.57 |    93.82 |     100 |     100 |
+  LocalStorageManager.js    |   97.57 |    93.82 |     100 |     100 | 45-48,139,169
+ utils                      |    73.8 |    78.57 |   90.47 |   73.52 |
+  favorites.js              |     100 |      100 |     100 |     100 |
+  timezone.js               |    61.4 |       58 |      75 |    62.5 | 55-94,108,114-117
+----------------------------|---------|----------|---------|---------|-----------------------
+PASS __tests__/services/F1DataService.test.js
+PASS __tests__/storage/LocalStorageManager.test.js
+PASS __tests__/services/JolpicaService.test.js
+PASS __tests__/services/F1ChampionshipStandings.test.js
+PASS __tests__/components/StandingsTable.test.js
+PASS __tests__/storage/FavoriteDriversCollection.test.js
+PASS __tests__/services/JolpicaCalendarAdapter.test.js
+PASS __tests__/storage/FavoritesCompatibility.test.js
+PASS __tests__/components/SessionCard.test.js
+PASS __tests__/utils/favorites.test.js
+PASS __tests__/components/DriverCard.test.js
+PASS __tests__/components/TelemetryWidget.test.js
+PASS __tests__/components/TrackMap.test.js
+PASS __tests__/components/CountdownTimer.test.js
+PASS __tests__/models/GranPremio.test.js
+PASS __tests__/components/RaceCard.test.js
+PASS __tests__/utils/timezone.test.js
+PASS __tests__/models/Sesion.test.js
+PASS __tests__/models/Piloto.test.js
+PASS __tests__/components/OfflineBanner.test.js
+PASS __tests__/components/LoadingScreen.test.js
+PASS __tests__/models/Escuderia.test.js
+
+Test Suites: 22 passed, 22 total
+Tests:       225 passed, 225 total
+Snapshots:   0 total
+Time:        12.224 s
+Ran all test suites.

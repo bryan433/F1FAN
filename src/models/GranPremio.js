@@ -1,4 +1,4 @@
-import { calculateTimeRemaining } from '../utils/timezone';
+import { calculateTimeRemaining, unknownTimeRemaining } from '../utils/timezone';
 
 /**
  * Entidad GranPremio - Modelo del Dominio F1Fan
@@ -12,15 +12,20 @@ export class GranPremio {
     nombreCorto = '',
     pais = '',
     bandera = '',
-    temporada = 2024,
-    round = 1,
-    totalRounds = 24,
+    temporada = null,
+    season = temporada,
+    round = null,
+    totalRounds = null,
     esProximo = false,
     estado = 'Programado', // 'Programado', 'Próximo', 'En curso', 'Finalizado', 'Cancelado'
     fechaInicio,
     fechaFin,
     circuito = null,
-    sesiones = []
+    sesiones = [],
+    fechaCarreraUTC = null,
+    date = null,
+    time = null,
+    warning = null,
   }) {
     this.idMeeting = idMeeting;
     this.nombreOficial = nombreOficial;
@@ -28,6 +33,7 @@ export class GranPremio {
     this.pais = pais;
     this.bandera = bandera;
     this.temporada = temporada;
+    this.season = season;
     this.round = round;
     this.totalRounds = totalRounds;
     this.esProximo = Boolean(esProximo);
@@ -36,12 +42,17 @@ export class GranPremio {
     this.fechaFin = fechaFin;
     this.circuito = circuito;
     this.sesiones = sesiones;
+    this.fechaCarreraUTC = fechaCarreraUTC;
+    this.date = date;
+    this.time = time;
+    this.warning = warning;
+    this.disponible = true;
   }
 
   calcularTiempoRestante() {
-    // Si tiene fecha de carrera (última sesión o fechaFin), calculamos cuenta regresiva
-    const raceSession = this.sesiones.find(s => s.tipo.toLowerCase().includes('race') || s.tipo.toLowerCase().includes('carrera'));
-    const targetDate = raceSession ? raceSession.fechaHoraUTC : this.fechaInicio;
+    const raceSession = this.sesiones.find(s => ['race', 'carrera'].includes(s.tipo?.toLowerCase()));
+    const targetDate = this.fechaCarreraUTC || (raceSession ? raceSession.fechaHoraUTC : this.fechaInicio);
+    if (!targetDate) return unknownTimeRemaining();
     return calculateTimeRemaining(targetDate);
   }
 }

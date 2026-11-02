@@ -23,7 +23,7 @@ const TRACK_POINTS = [
   { x: 30, y: 70 },
 ];
 
-export default function TrackMap({ circuitName = 'MARINA BAY STREET CIRCUIT', isLive = true }) {
+export default function TrackMap({ circuitName = 'MARINA BAY STREET CIRCUIT', isLive = true, isDemo = false }) {
   const [carProgress, setCarProgress] = useState(0);
 
   useEffect(() => {
@@ -42,8 +42,8 @@ export default function TrackMap({ circuitName = 'MARINA BAY STREET CIRCUIT', is
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.trackName}>{circuitName}</Text>
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>EN VIVO • V12</Text>
+        <View style={[styles.statusBadge, isDemo && styles.demoBadge]}>
+          <Text style={[styles.statusText, isDemo && styles.demoText]}>{isDemo ? 'V12 SIMULADA' : 'EN VIVO • V12'}</Text>
         </View>
       </View>
 
@@ -96,15 +96,15 @@ export default function TrackMap({ circuitName = 'MARINA BAY STREET CIRCUIT', is
       <View style={styles.legendRow}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: '#FF8000' }]} />
-          <Text style={styles.legendText}>NOR #4 (P1)</Text>
+          <Text style={styles.legendText}>{isDemo ? 'NOR #4 (P1 DEMO)' : 'NOR #4 (P1)'}</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: '#27F4D2' }]} />
-          <Text style={styles.legendText}>RUS #63 (P3 ★)</Text>
+          <Text style={styles.legendText}>{isDemo ? 'RUS #63 (P3 DEMO)' : 'RUS #63 (P3 ★)'}</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: '#E10600' }]} />
-          <Text style={styles.legendText}>Zona DRS 1 & 2</Text>
+          <Text style={styles.legendText}>{isDemo ? 'DRS DE EJEMPLO' : 'Zona DRS 1 & 2'}</Text>
         </View>
       </View>
     </View>
@@ -143,6 +143,12 @@ const styles = StyleSheet.create({
     color: Colors.primaryRed,
     fontSize: 10,
     fontWeight: '800',
+  },
+  demoBadge: {
+    backgroundColor: 'rgba(0, 210, 190, 0.15)',
+  },
+  demoText: {
+    color: Colors.accentCyan,
   },
   mapCanvas: {
     height: 210,

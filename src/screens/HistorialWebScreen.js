@@ -1,59 +1,83 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, ActivityIndicator } from 'react-native';
 import { Colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
-
-const HISTORICAL_DATA = {
-  '2024': [
-    { round: 1, gp: 'Baréin', circuit: 'Sakhir', winner: 'M. VERSTAPPEN', pole: 'M. VERSTAPPEN', fastest: 'M. VERSTAPPEN' },
-    { round: 2, gp: 'Arabia Saudita', circuit: 'Jeddah', winner: 'M. VERSTAPPEN', pole: 'M. VERSTAPPEN', fastest: 'C. LECLERC' },
-    { round: 3, gp: 'Australia', circuit: 'Melbourne', winner: 'C. SAINZ', pole: 'M. VERSTAPPEN', fastest: 'C. LECLERC' },
-    { round: 4, gp: 'Japón', circuit: 'Suzuka', winner: 'M. VERSTAPPEN', pole: 'M. VERSTAPPEN', fastest: 'M. VERSTAPPEN' },
-    { round: 5, gp: 'China', circuit: 'Shanghai', winner: 'M. VERSTAPPEN', pole: 'M. VERSTAPPEN', fastest: 'F. ALONSO' },
-    { round: 6, gp: 'Miami', circuit: 'Miami', winner: 'L. NORRIS', pole: 'M. VERSTAPPEN', fastest: 'O. PIASTRI' },
-    { round: 7, gp: 'Emilia-Romaña', circuit: 'Imola', winner: 'M. VERSTAPPEN', pole: 'M. VERSTAPPEN', fastest: 'G. RUSSELL' },
-    { round: 8, gp: 'Mónaco', circuit: 'Monte Carlo', winner: 'C. LECLERC', pole: 'C. LECLERC', fastest: 'L. HAMILTON' },
-    { round: 9, gp: 'Canadá', circuit: 'Montreal', winner: 'M. VERSTAPPEN', pole: 'G. RUSSELL', fastest: 'L. HAMILTON' },
-    { round: 10, gp: 'España', circuit: 'Barcelona', winner: 'M. VERSTAPPEN', pole: 'L. NORRIS', fastest: 'L. NORRIS' },
-    { round: 11, gp: 'Austria', circuit: 'Red Bull Ring', winner: 'G. RUSSELL', pole: 'M. VERSTAPPEN', fastest: 'F. ALONSO' },
-    { round: 12, gp: 'Gran Bretaña', circuit: 'Silverstone', winner: 'L. HAMILTON', pole: 'G. RUSSELL', fastest: 'C. SAINZ' },
-    { round: 13, gp: 'Hungría', circuit: 'Hungaroring', winner: 'O. PIASTRI', pole: 'L. NORRIS', fastest: 'G. RUSSELL' },
-    { round: 14, gp: 'Bélgica', circuit: 'Spa-Francorchamps', winner: 'L. HAMILTON', pole: 'C. LECLERC', fastest: 'S. PÉREZ' },
-    { round: 15, gp: 'Países Bajos', circuit: 'Zandvoort', winner: 'L. NORRIS', pole: 'L. NORRIS', fastest: 'L. NORRIS' },
-    { round: 16, gp: 'Italia', circuit: 'Monza', winner: 'C. LECLERC', pole: 'L. NORRIS', fastest: 'L. NORRIS' },
-    { round: 17, gp: 'Azerbaiyán', circuit: 'Baku', winner: 'O. PIASTRI', pole: 'C. LECLERC', fastest: 'L. NORRIS' }
-  ],
-  '2023': [
-    { round: 1, gp: 'Baréin', circuit: 'Sakhir', winner: 'M. VERSTAPPEN', pole: 'M. VERSTAPPEN', fastest: 'Z. GUANYU' },
-    { round: 2, gp: 'Arabia Saudita', circuit: 'Jeddah', winner: 'S. PÉREZ', pole: 'S. PÉREZ', fastest: 'M. VERSTAPPEN' },
-    { round: 3, gp: 'Australia', circuit: 'Melbourne', winner: 'M. VERSTAPPEN', pole: 'M. VERSTAPPEN', fastest: 'S. PÉREZ' },
-    { round: 16, gp: 'Singapur', circuit: 'Marina Bay', winner: 'C. SAINZ', pole: 'C. SAINZ', fastest: 'L. HAMILTON' },
-    { round: 22, gp: 'Abu Dabi', circuit: 'Yas Marina', winner: 'M. VERSTAPPEN', pole: 'M. VERSTAPPEN', fastest: 'M. VERSTAPPEN' }
-  ]
-};
+import { filterHistoricalRaces, getSeasons, getSeasonHistory } from '../services/JolpicaService';
 
 export default function HistorialWebScreen({ navigation }) {
-  const [selectedSeason, setSelectedSeason] = useState('2024');
+  const [seasons, setSeasons] = useState([]);
+  const [selectedSeason, setSelectedSeason] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [races, setRaces] = useState([]);
+  const [selectorVisible, setSelectorVisible] = useState(false);
+  const [loadingSeasons, setLoadingSeasons] = useState(true);
+  const [loadingRaces, setLoadingRaces] = useState(false);
+  const [seasonsError, setSeasonsError] = useState(null);
+  const [racesError, setRacesError] = useState(null);
+  const [seasonsWarning, setSeasonsWarning] = useState(null);
+  const [racesWarning, setRacesWarning] = useState(null);
+  const [seasonsAttempt, setSeasonsAttempt] = useState(0);
+  const [racesAttempt, setRacesAttempt] = useState(0);
 
-  const currentRaces = HISTORICAL_DATA[selectedSeason] || HISTORICAL_DATA['2024'];
+  useEffect(() => {
+    let active = true;
+    setLoadingSeasons(true);
+    setSeasonsError(null);
+    getSeasons()
+      .then(({ data, warning }) => {
+        if (!active) return;
+        setSeasons(data);
+        setSeasonsWarning(warning);
+        setSelectedSeason(previous => data.includes(previous) ? previous : data[0] || null);
+      })
+      .catch(() => {
+        if (active) setSeasonsError('No se pudieron cargar las temporadas de Jolpica.');
+      })
+      .finally(() => {
+        if (active) setLoadingSeasons(false);
+      });
+    return () => { active = false; };
+  }, [seasonsAttempt]);
 
-  // Filtro en el cliente según SD-08 sin consultar al servidor
-  const filteredRaces = currentRaces.filter(r => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      r.winner.toLowerCase().includes(q) ||
-      r.gp.toLowerCase().includes(q) ||
-      r.circuit.toLowerCase().includes(q) ||
-      r.pole.toLowerCase().includes(q)
-    );
-  });
+  useEffect(() => {
+    if (!selectedSeason) return;
+    let active = true;
+    setLoadingRaces(true);
+    setRaces([]);
+    setRacesError(null);
+    setRacesWarning(null);
+    getSeasonHistory(selectedSeason)
+      .then(({ data, warning }) => {
+        if (!active) return;
+        setRaces(data);
+        setRacesWarning(warning);
+      })
+      .catch(() => {
+        if (active) setRacesError(`No se pudieron cargar las carreras de ${selectedSeason}.`);
+      })
+      .finally(() => {
+        if (active) setLoadingRaces(false);
+      });
+    // Una respuesta anterior no debe reemplazar la temporada seleccionada después.
+    return () => { active = false; };
+  }, [selectedSeason, racesAttempt]);
+
+  const selectSeason = year => {
+    setSelectorVisible(false);
+    if (year === selectedSeason) return;
+    setRaces([]);
+    setRacesError(null);
+    setRacesWarning(null);
+    setLoadingRaces(true);
+    setSelectedSeason(year);
+  };
+
+  const filteredRaces = filterHistoricalRaces(races, searchQuery);
 
   return (
     <View style={styles.container}>
       <View style={styles.navBar}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver" style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.navTitle}>Historial Multiplataforma (Web & Móvil)</Text>
@@ -63,47 +87,122 @@ export default function HistorialWebScreen({ navigation }) {
       {/* Selector de Temporada y Buscador en el Cliente (SD-08) */}
       <View style={styles.controlBar}>
         <View style={styles.seasonRow}>
-          {['2024', '2023'].map(year => (
-            <TouchableOpacity
-              key={year}
-              style={[styles.yearPill, selectedSeason === year && styles.yearPillActive]}
-              onPress={() => setSelectedSeason(year)}
-            >
-              <Text style={[styles.yearText, selectedSeason === year && styles.yearTextActive]}>
-                {year}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Seleccionar temporada"
+            accessibilityState={{ expanded: selectorVisible, disabled: loadingSeasons || seasons.length === 0 }}
+            style={[styles.yearPill, styles.yearPillActive, styles.seasonSelector]}
+            disabled={loadingSeasons || seasons.length === 0}
+            onPress={() => setSelectorVisible(true)}
+          >
+            <Text style={[styles.yearText, styles.yearTextActive]}>
+              {selectedSeason ? `Temporada ${selectedSeason}` : 'Seleccionar temporada'}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.searchBox}>
           <Ionicons name="search" size={16} color={Colors.textMuted} style={{ marginRight: 8 }} />
           <TextInput
+            accessibilityLabel="Buscar en el historial"
             style={styles.searchInput}
-            placeholder="Filtrar por piloto (ej: Russell, Leclerc)..."
+            placeholder="Buscar por piloto, Gran Premio o circuito (ej: Russell, Leclerc)..."
             placeholderTextColor={Colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
           {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Limpiar búsqueda" onPress={() => setSearchQuery('')}>
               <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
             </TouchableOpacity>
           ) : null}
         </View>
       </View>
 
+      <Modal
+        visible={selectorVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectorVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.seasonModal} accessibilityViewIsModal>
+            <Text style={styles.modalTitle}>Selecciona una temporada</Text>
+            <ScrollView accessibilityLabel="Temporadas disponibles">
+              {seasons.map(year => (
+                <TouchableOpacity
+                  key={year}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Temporada ${year}`}
+                  accessibilityState={{ selected: year === selectedSeason }}
+                  style={[styles.seasonOption, year === selectedSeason && styles.yearPillActive]}
+                  onPress={() => selectSeason(year)}
+                >
+                  <Text style={styles.yearTextActive}>{year}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity accessibilityRole="button" style={styles.yearPill} onPress={() => setSelectorVisible(false)}>
+              <Text style={styles.yearText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {(loadingSeasons || loadingRaces) && (
+          <View style={styles.emptyState}>
+            <ActivityIndicator color={Colors.primaryRed} />
+            <Text style={styles.emptyText}>
+              {loadingSeasons ? 'Cargando temporadas...' : `Cargando carreras de ${selectedSeason}...`}
+            </Text>
+          </View>
+        )}
+        {(seasonsError || racesError) && (
+          <View style={styles.emptyState}>
+            <Text accessibilityRole="alert" style={styles.emptyText}>{seasonsError || racesError}</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              style={styles.yearPill}
+              onPress={() => seasonsError ? setSeasonsAttempt(value => value + 1) : setRacesAttempt(value => value + 1)}
+            >
+              <Text style={styles.yearText}>Reintentar</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {(seasonsWarning || racesWarning) && (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>{[seasonsWarning, racesWarning].filter(Boolean).join(' ')}</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              style={styles.yearPill}
+              onPress={() => {
+                if (seasonsWarning) setSeasonsAttempt(value => value + 1);
+                if (racesWarning) setRacesAttempt(value => value + 1);
+              }}
+            >
+              <Text style={styles.yearText}>Reintentar actualización</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        <Text style={styles.dataNotice}>Clasif. P1: primera posición de clasificación informada por Jolpica. — indica datos no disponibles.</Text>
         <View style={styles.tableHeader}>
           <Text style={[styles.th, { width: 32 }]}>RND</Text>
           <Text style={[styles.th, { flex: 1.2 }]}>GRAN PREMIO</Text>
           <Text style={[styles.th, { flex: 1.5 }]}>GANADOR</Text>
-          <Text style={[styles.th, { flex: 1.2, textAlign: 'right' }]}>POLE</Text>
+          <Text style={[styles.th, { flex: 1.2, textAlign: 'right' }]}>CLASIF. P1</Text>
         </View>
 
-        {filteredRaces.length === 0 ? (
+        {!loadingSeasons && !loadingRaces && !seasonsError && !racesError && (filteredRaces.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No se encontraron carreras con ese filtro.</Text>
+            <Text style={styles.emptyText}>
+              {seasons.length === 0
+                ? 'No hay temporadas disponibles.'
+                : races.length === 0
+                  ? 'No hay carreras disponibles para esta temporada.'
+                  : 'No se encontraron carreras con ese filtro.'}
+            </Text>
           </View>
         ) : (
           filteredRaces.map((race) => (
@@ -114,13 +213,13 @@ export default function HistorialWebScreen({ navigation }) {
                 <Text style={styles.circuitName}>{race.circuit}</Text>
               </View>
               <View style={styles.winnerCol}>
-                <Ionicons name="trophy" size={12} color={Colors.accentYellow} style={{ marginRight: 4 }} />
-                <Text style={styles.winnerName}>{race.winner}</Text>
+                {race.winner && <Ionicons name="trophy" size={12} color={Colors.accentYellow} style={{ marginRight: 4 }} />}
+                <Text style={styles.winnerName}>{race.winner || '—'}</Text>
               </View>
-              <Text style={styles.poleCol}>{race.pole.split(' ').pop()}</Text>
+              <Text style={styles.poleCol}>{race.qualifyingFirst || '—'}</Text>
             </View>
           ))
-        )}
+        ))}
       </ScrollView>
     </View>
   );
@@ -181,6 +280,43 @@ const styles = StyleSheet.create({
   },
   yearTextActive: {
     color: '#FFFFFF',
+  },
+  seasonSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  seasonModal: {
+    width: '100%',
+    maxWidth: 360,
+    height: '70%',
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: 12,
+    padding: 16,
+  },
+  modalTitle: {
+    color: Colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 12,
+  },
+  seasonOption: {
+    height: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  dataNotice: {
+    color: Colors.textSecondary,
+    fontSize: 11,
+    padding: 12,
   },
   searchBox: {
     flexDirection: 'row',

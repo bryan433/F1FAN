@@ -9,16 +9,22 @@ export default function StandingsTable({
   teams = [],
   onDriverPress,
   onTeamPress,
-  onToggleFavorite
+  onToggleFavorite,
+  onToggleTeamFavorite
 }) {
   const [activeTab, setActiveTab] = useState('pilotos'); // 'pilotos' | 'constructores'
 
   // Datos para la comparativa rápida de los dos punteros
-  const leader1 = drivers[0] || { codigo: 'NOR', puntos: 324, colorHex: '#FF8000' };
-  const leader2 = drivers[1] || { codigo: 'VER', puntos: 310, colorHex: '#3671C6' };
-  const totalPoints = (leader1.puntos + leader2.puntos) || 1;
-  const pct1 = Math.round((leader1.puntos / totalPoints) * 100);
-  const pct2 = 100 - pct1;
+  const leader1 = drivers[0];
+  const leader2 = drivers[1];
+  const hasLeaders = Boolean(leader1 && leader2);
+  const hasValidPoints = hasLeaders
+    && Number.isFinite(leader1.puntos) && leader1.puntos >= 0
+    && Number.isFinite(leader2.puntos) && leader2.puntos >= 0;
+  const totalPoints = hasValidPoints ? leader1.puntos + leader2.puntos : 0;
+  const canCompare = hasValidPoints && Number.isFinite(totalPoints) && totalPoints > 0;
+  const pct1 = canCompare ? Math.round((leader1.puntos / totalPoints) * 100) : null;
+  const pct2 = canCompare ? 100 - pct1 : null;
 
   return (
     <View style={styles.container}>
@@ -52,7 +58,7 @@ export default function StandingsTable({
             <DriverCard
               key={driver.idPiloto || index}
               driver={driver}
-              position={index + 1}
+              position={driver.source === 'jolpica' ? driver.positionText || driver.posicionCampeonato || '—' : index + 1}
               onPress={() => onDriverPress && onDriverPress(driver)}
               onToggleFavorite={onToggleFavorite}
             />
@@ -61,38 +67,56 @@ export default function StandingsTable({
           {/* Gráfico Comparativo Inferior según mockup 08 */}
           <View style={styles.comparisonBox}>
             <Text style={styles.compTitle}>Duelo por el Campeonato Mundial</Text>
-            <View style={styles.compBar}>
-              <View style={[styles.barHalf, { flex: pct1, backgroundColor: leader1.colorHex }]} />
-              <View style={[styles.barHalf, { flex: pct2, backgroundColor: leader2.colorHex }]} />
-            </View>
-            <View style={styles.compLabels}>
-              <Text style={[styles.compLabelText, { color: leader1.colorHex }]}>
-                {leader1.codigo} • {leader1.puntos} PTS ({pct1}%)
+            {canCompare ? (
+              <>
+                <View style={styles.compBar}>
+                  <View style={[styles.barHalf, { flex: pct1, backgroundColor: leader1.colorHex }]} />
+                  <View style={[styles.barHalf, { flex: pct2, backgroundColor: leader2.colorHex }]} />
+                </View>
+                <View style={styles.compLabels}>
+                  <Text style={[styles.compLabelText, { color: leader1.colorHex }]}>
+                    {leader1.codigo} • {leader1.puntos} PTS ({pct1}%)
+                  </Text>
+                  <Text style={[styles.compLabelText, { color: leader2.colorHex }]}>
+                    {leader2.codigo} • {leader2.puntos} PTS ({pct2}%)
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <Text style={styles.comparisonNotice}>
+                {!hasLeaders
+                  ? 'Se necesitan al menos dos pilotos para comparar.'
+                  : hasValidPoints && totalPoints === 0
+                    ? 'No hay puntos para calcular porcentajes.'
+                    : 'No hay puntuaciones válidas para comparar.'}
               </Text>
-              <Text style={[styles.compLabelText, { color: leader2.colorHex }]}>
-                {leader2.codigo} • {leader2.puntos} PTS ({pct2}%)
-              </Text>
-            </View>
+            )}
           </View>
         </View>
       ) : (
         <View style={styles.listContainer}>
           {teams.map((team, index) => (
             <TouchableOpacity
-              key={team.id || index}
+              key={team.idEscuderia ?? team.id ?? index}
               style={styles.teamCard}
               onPress={() => onTeamPress && onTeamPress(team)}
               activeOpacity={0.8}
             >
-              <Text style={styles.teamPos}>{index + 1}</Text>
+              <Text style={styles.teamPos}>{team.source === 'jolpica' ? team.positionText || team.posicionCampeonato || '—' : index + 1}</Text>
               <View style={[styles.teamColor, { backgroundColor: team.colorHex }]} />
               <View style={styles.teamInfo}>
-                <Text style={styles.teamName}>{team.name || team.fullName}</Text>
+                <Text style={styles.teamName}>{team.nombre || team.name || team.fullName || 'Nombre de escudería no disponible'}</Text>
               </View>
               <View style={styles.teamPointsBox}>
-                <Text style={styles.teamPoints}>{team.puntos || team.points || 0}</Text>
+                <Text style={styles.teamPoints}>{team.puntos ?? team.points ?? (team.source === 'jolpica' ? 'No disponible' : 0)}</Text>
                 <Text style={styles.teamPointsUnit}>PTS</Text>
               </View>
+              {onToggleTeamFavorite && <TouchableOpacity accessibilityRole="button"
+                accessibilityLabel={`${team.esFavorito ? 'Quitar' : 'Marcar'} escudería favorita ${team.nombre || team.name || team.fullName}`}
+                onPress={() => onToggleTeamFavorite(team)} style={{ padding: 8, marginLeft: 8 }}>
+                <Ionicons name={team.esFavorito ? 'star' : 'star-outline'} size={18}
+                  color={team.esFavorito ? Colors.accentYellow : Colors.textMuted} />
+              </TouchableOpacity>}
             </TouchableOpacity>
           ))}
         </View>
@@ -195,6 +219,11 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 8,
+    textAlign: 'center',
+  },
+  comparisonNotice: {
+    color: Colors.textSecondary,
+    fontSize: 12,
     textAlign: 'center',
   },
   compBar: {

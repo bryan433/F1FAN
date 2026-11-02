@@ -10,7 +10,7 @@ export default function MasScreen({ navigation }) {
     {
       id: 'favs',
       title: 'Favoritos',
-      subtitle: 'Russell #63, Mercedes',
+      subtitle: 'Tus pilotos y escuderías guardados',
       icon: 'star',
       color: Colors.accentYellow,
       route: 'Favoritos'

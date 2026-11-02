@@ -1,45 +1,122 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Colors } from '../theme/colors';
-import TrackMap from '../components/TrackMap';
 import SessionCard from '../components/SessionCard';
+import OfflineBanner from '../components/OfflineBanner';
 import { Ionicons } from '@expo/vector-icons';
-import { CURRENT_MEETING } from '../data/mockData';
+import { isValidCalendarDate } from '../utils/timezone';
+import OpenF1Client from '../services/OpenF1Client';
+
+const finished = session => ['Finalizado', 'Finalizada', 'Resultados disponibles'].includes(session?.estado);
+const positiveInteger = value => /^(?:[1-9]\d*)$/.test(String(value)) && Number.isSafeInteger(Number(value));
+
+// Conserva los segmentos Q1/Q2/Q3 y los gaps por vueltas publicados por OpenF1.
+function resultValue(value, gap = false) {
+  if (Array.isArray(value)) return value.map(part => resultValue(part, gap)).join(' / ');
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+    return `${gap && value > 0 ? '+' : ''}${value.toFixed(3)} s`;
+  }
+  return gap && typeof value === 'string' && /^\+\d+ LAPS?$/.test(value) ? value : '—';
+}
 
 export default function DetalleGPScreen({ route, navigation }) {
-  const meeting = route.params?.meeting || CURRENT_MEETING;
-  const circuito = meeting.circuito || CURRENT_MEETING.circuito;
-  const sesiones = meeting.sesiones || CURRENT_MEETING.sesiones;
+  const meeting = route?.params?.meeting;
+  const circuito = meeting?.circuito || {};
+  const sesiones = Array.isArray(meeting?.sesiones)
+    ? meeting.sesiones.filter(session => session && typeof session === 'object') : [];
+  const raceSession = sesiones.find(session => session.sourceKey === 'Race'
+    || ['race', 'carrera'].includes(session.tipo?.toLowerCase()));
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [results, setResults] = useState({ session: null, loading: false, rows: [], error: null });
 
-  const [selectedSessionResults, setSelectedSessionResults] = useState(null);
+  useEffect(() => {
+    setSelectedSession(null);
+    setIsFollowing(false);
+  }, [meeting]);
 
-  const mockSessionResults = [
-    { pos: 1, code: 'LEC', driver: 'C. Leclerc', team: 'Ferrari', time: '1:31.763', gap: 'LÍDER', color: '#E8002D' },
-    { pos: 2, code: 'RUS', driver: 'G. Russell', team: 'Mercedes', time: '1:31.844', gap: '+0.081s', color: '#27F4D2' },
-    { pos: 3, code: 'NOR', driver: 'L. Norris', team: 'McLaren', time: '1:31.902', gap: '+0.139s', color: '#FF8000' },
-    { pos: 4, code: 'VER', driver: 'M. Verstappen', team: 'Red Bull', time: '1:32.011', gap: '+0.248s', color: '#3671C6' },
-    { pos: 5, code: 'HAM', driver: 'L. Hamilton', team: 'Mercedes', time: '1:32.225', gap: '+0.462s', color: '#27F4D2' },
+  useEffect(() => {
+    let active = true;
+    const empty = { session: selectedSession, loading: false, rows: [], error: null };
+    // Nunca se infiere una clave OpenF1 desde idSesion, temporada o ronda Jolpica.
+    const isOpenF1 = meeting?.source !== 'jolpica' && selectedSession?.source !== 'jolpica'
+      && (selectedSession?.source ?? meeting?.source) === 'openf1';
+    const key = selectedSession?.session_key;
+    if (!finished(selectedSession) || !isOpenF1 || !positiveInteger(key)) {
+      setResults(empty);
+      return () => { active = false; };
+    }
+    setResults({ ...empty, loading: true });
+    (async () => {
+      try {
+        const rows = await OpenF1Client.getSessionResults(Number(key));
+        if (!active) return;
+        if (!Array.isArray(rows) || rows.some(row => !row
+          || String(row.session_key) !== String(key) || !positiveInteger(row.driver_number)
+          || (meeting?.meeting_key != null && String(row.meeting_key) !== String(meeting.meeting_key)))) {
+          throw new Error('Los resultados no corresponden a la sesión seleccionada.');
+        }
+        // Los nombres son opcionales: un fallo de metadatos no descarta resultados válidos.
+        let drivers = [];
+        if (rows.length) {
+          try { drivers = await OpenF1Client.getDrivers({ session_key: Number(key) }); }
+          catch { /* Se muestra el dorsal publicado sin inventar un nombre. */ }
+        }
+        if (!active) return;
+        const data = rows.map(row => {
+          const driver = Array.isArray(drivers) && drivers.find(item => item
+            && String(item.session_key) === String(key) && item.driver_number === row.driver_number);
+          const status = row.dsq === true ? 'DSQ' : row.dns === true ? 'DNS' : row.dnf === true ? 'DNF' : null;
+          return {
+            number: row.driver_number, position: positiveInteger(row.position) ? Number(row.position) : null,
+            driver: driver?.full_name || `Piloto #${row.driver_number}`, team: driver?.team_name || 'Escudería no disponible',
+            color: /^[0-9a-f]{6}$/i.test(driver?.team_colour) ? `#${driver.team_colour}` : Colors.textMuted,
+            time: status || resultValue(row.duration),
+            gap: row.position === 1 && row.gap_to_leader === 0 ? 'LÍDER' : resultValue(row.gap_to_leader, true),
+          };
+        }).sort((a, b) => (a.position ?? Infinity) - (b.position ?? Infinity));
+        setResults({ ...empty, rows: data });
+      } catch (error) {
+        if (active) setResults({ ...empty, error: error.message });
+      }
+    })();
+    return () => { active = false; };
+  }, [selectedSession, meeting]);
+
+  const displayedResults = results.session === selectedSession ? results : { rows: [], loading: false, error: null };
+
+  const toggleFollow = () => setIsFollowing(prev => !prev);
+  const season = meeting?.season ?? meeting?.temporada;
+  const location = [circuito.ciudad, circuito.pais].filter(Boolean).join(', ');
+  const raceDate = raceSession?.fechaChile || meeting?.dateRange
+    || (isValidCalendarDate(meeting?.date) ? `${meeting.date} (fecha UTC)` : 'Fecha por confirmar');
+  const raceHour = raceSession?.horaChile ? `${raceSession.horaChile} (Santiago)`
+    : meeting?.localChileHour || 'Hora por confirmar';
+  const positiveNumber = value => typeof value === 'number' && value > 0 && Number.isFinite(value);
+  const stats = [
+    ['LONGITUD', positiveNumber(circuito.longitudKm) ? `${circuito.longitudKm} km` : null],
+    ['VUELTAS', positiveNumber(circuito.numeroVueltas) ? circuito.numeroVueltas : null],
+    ['CURVAS', positiveNumber(circuito.numeroCurvas) ? circuito.numeroCurvas : null],
+    ['RÉCORD VUELTA', circuito.recordVuelta],
   ];
 
-  const handleSessionPress = (session) => {
-    if (session.esLive) {
-      navigation.navigate('Live');
-    } else if (session.estado === 'Finalizado') {
-      setSelectedSessionResults(session);
+  const handleSessionPress = session => {
+    if (session.esLive === true || session.estado === 'En curso') {
+      // Detalle es una pantalla del Stack; En Vivo pertenece a MainTabs.
+      navigation.navigate('MainTabs', { screen: 'En Vivo' });
     } else {
-      Alert.alert('Sesión Programada', `${session.tipo} iniciará el ${session.dia} a las ${session.horaChile} CLT.`);
+      setSelectedSession(session);
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* Barra superior de navegación */}
       <View style={styles.navBar}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver" style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.navTitle}>{meeting.nombreCorto || meeting.name || 'Gran Premio'}</Text>
-        <TouchableOpacity style={styles.followBtn} onPress={toggleFollow}>
+        <Text style={styles.navTitle}>{meeting?.nombreCorto || meeting?.nombreOficial || meeting?.name || 'Gran Premio'}</Text>
+        <TouchableOpacity accessibilityRole="button" disabled={!meeting} style={styles.followBtn} onPress={toggleFollow}>
           <Ionicons name={isFollowing ? 'notifications' : 'notifications-outline'} size={18} color={isFollowing ? Colors.accentYellow : Colors.textPrimary} />
           <Text style={[styles.followBtnText, isFollowing && { color: Colors.accentYellow }]}>
             {isFollowing ? 'SIGUIENDO' : 'SEGUIR'}
@@ -47,121 +124,103 @@ export default function DetalleGPScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
+      <OfflineBanner visible={Boolean(meeting?.warning)} message={meeting?.warning || ''} />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Título y Ciudad */}
-        <View style={styles.headerInfo}>
-          <Text style={styles.circuitTitle}>{circuito.nombreCircuito}</Text>
-          <Text style={styles.circuitLocation}>{circuito.ciudad}, {circuito.pais} • Round {meeting.round || 17}</Text>
-        </View>
-
-        {/* Acceso a Vista AR según Mockup 11 */}
-        <TouchableOpacity
-          style={styles.arBanner}
-          onPress={() => navigation.navigate('RealidadAumentada')}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="cube" size={20} color="#000000" />
-          <Text style={styles.arBannerText}>VER CIRCUITO EN REALIDAD AUMENTADA</Text>
-        </TouchableOpacity>
-
-        {/* Mapa Gráfico */}
-        <TrackMap circuitName={circuito.nombreCircuito} isLive={false} />
-
-        {/* Ficha Técnica del Circuito según Mockup 11 */}
-        <View style={styles.statsCard}>
-          <Text style={styles.cardSectionTitle}>FICHA TÉCNICA DEL TRAZADO</Text>
-          
-          <View style={styles.statsGrid}>
-            <View style={styles.statBox}>
-              <Text style={styles.statVal}>{circuito.longitudKm} km</Text>
-              <Text style={styles.statLbl}>LONGITUD</Text>
-            </View>
-
-            <View style={styles.statBox}>
-              <Text style={styles.statVal}>{circuito.numeroVueltas}</Text>
-              <Text style={styles.statLbl}>VUELTAS</Text>
-            </View>
-
-            <View style={styles.statBox}>
-              <Text style={styles.statVal}>{circuito.numeroCurvas}</Text>
-              <Text style={styles.statLbl}>CURVAS</Text>
-            </View>
-
-            <View style={styles.statBox}>
-              <Text style={styles.statVal}>{circuito.recordVuelta}</Text>
-              <Text style={styles.statLbl}>RÉCORD VUELTA</Text>
-            </View>
+        {!meeting ? (
+          <View style={styles.statsCard}>
+            <Text style={styles.circuitTitle}>Información del Gran Premio no disponible</Text>
+            <Text style={styles.circuitLocation}>Selecciona un GP desde Inicio o Calendario.</Text>
           </View>
-        </View>
-
-        {/* Condiciones Meteorológicas */}
-        <View style={styles.weatherCard}>
-          <Text style={styles.cardSectionTitle}>CONDICIONES METEOROLÓGICAS</Text>
-          <View style={styles.weatherRow}>
-            <View style={styles.weatherItem}>
-              <Ionicons name="thermometer-outline" size={18} color={Colors.accentOrange} />
-              <Text style={styles.weatherText}>Aire: {circuito.temperaturaAire || '29°C'}</Text>
+        ) : (
+          <>
+            <View style={styles.headerInfo}>
+              <Text style={styles.circuitTitle}>{circuito.nombreCircuito || 'Circuito: información no disponible'}</Text>
+              <Text style={styles.circuitLocation}>{location || 'Ubicación: información no disponible'}</Text>
+              <Text style={styles.circuitLocation}>Temporada {season ?? 'Información no disponible'} • Ronda {meeting.round ?? 'Información no disponible'}</Text>
+              <Text style={styles.circuitLocation}>{raceDate}</Text>
+              <Text style={styles.circuitLocation}>{raceHour}</Text>
             </View>
-            <View style={styles.weatherItem}>
-              <Ionicons name="speedometer-outline" size={18} color={Colors.primaryRed} />
-              <Text style={styles.weatherText}>Pista: {circuito.temperaturaPista || '38°C'}</Text>
+
+            <TouchableOpacity accessibilityRole="button" style={styles.arBanner} onPress={() => navigation.navigate('RealidadAumentada')} activeOpacity={0.8}>
+              <Ionicons name="cube" size={20} color="#000000" />
+              <Text style={styles.arBannerText}>VER DEMOSTRACIÓN EN REALIDAD AUMENTADA</Text>
+            </TouchableOpacity>
+            <Text style={[styles.circuitLocation, { marginHorizontal: 16 }]}>La demostración no representa el circuito ni la telemetría de este GP.</Text>
+
+            <View style={styles.statsCard}>
+              <Text style={styles.cardSectionTitle}>MAPA Y TELEMETRÍA</Text>
+              <Text style={styles.circuitLocation}>Mapa y telemetría no disponibles para este GP.</Text>
             </View>
-            <View style={styles.weatherItem}>
-              <Ionicons name="water-outline" size={18} color={Colors.accentCyan} />
-              <Text style={styles.weatherText}>Humedad: 76%</Text>
-            </View>
-          </View>
-        </View>
 
-        {/* Sesiones del Gran Premio */}
-        <View style={styles.sessionsHeader}>
-          <Text style={styles.cardSectionTitle}>SESIONES DEL FIN DE SEMANA</Text>
-          <Text style={styles.cltNotice}>HORARIOS CHILE (CLT)</Text>
-        </View>
-
-        {sesiones.map((session) => (
-          <SessionCard
-            key={session.idSesion}
-            session={session}
-            onPress={() => handleSessionPress(session)}
-          />
-        ))}
-
-        {/* Modal / Sección de Resultados de Sesión (RF-04: /session_result) */}
-        {selectedSessionResults && (
-          <View style={styles.resultsModalCard}>
-            <View style={styles.resultsHeaderRow}>
-              <View>
-                <Text style={styles.resultsTitle}>RESULTADOS: {selectedSessionResults.tipo.toUpperCase()}</Text>
-                <Text style={styles.resultsSubtitle}>Tiempos y diferencias oficiales (/session_result)</Text>
+            <View style={styles.statsCard}>
+              <Text style={styles.cardSectionTitle}>FICHA TÉCNICA DEL TRAZADO</Text>
+              <View style={styles.statsGrid}>
+                {stats.map(([label, value]) => (
+                  <View style={styles.statBox} key={label}>
+                    <Text style={styles.statVal}>{value || 'Información no disponible'}</Text>
+                    <Text style={styles.statLbl}>{label}</Text>
+                  </View>
+                ))}
               </View>
-              <TouchableOpacity onPress={() => setSelectedSessionResults(null)} style={styles.closeResultsBtn}>
-                <Ionicons name="close-circle" size={24} color={Colors.textSecondary} />
-              </TouchableOpacity>
             </View>
 
-            <View style={styles.resultsTableHead}>
-              <Text style={[styles.thText, { width: 30 }]}>POS</Text>
-              <Text style={[styles.thText, { flex: 1 }]}>PILOTO</Text>
-              <Text style={[styles.thText, { width: 75, textAlign: 'right' }]}>TIEMPO</Text>
-              <Text style={[styles.thText, { width: 65, textAlign: 'right' }]}>DIF</Text>
+            <View style={styles.weatherCard}>
+              <Text style={styles.cardSectionTitle}>CONDICIONES METEOROLÓGICAS</Text>
+              <Text style={styles.circuitLocation}>Información no disponible en el calendario de Jolpica.</Text>
             </View>
 
-            {mockSessionResults.map((res) => (
-              <View key={res.pos} style={styles.resultRow}>
-                <Text style={styles.resultPos}>{res.pos}</Text>
-                <View style={[styles.teamDot, { backgroundColor: res.color }]} />
-                <View style={styles.pilotInfo}>
-                  <Text style={styles.resultDriver}>{res.driver}</Text>
-                  <Text style={styles.resultTeam}>{res.team}</Text>
-                </View>
-                <Text style={styles.resultTime}>{res.time}</Text>
-                <Text style={[styles.resultGap, res.gap === 'LÍDER' ? styles.gapLeader : null]}>
-                  {res.gap}
-                </Text>
-              </View>
+            <View style={styles.sessionsHeader}>
+              <Text style={styles.cardSectionTitle}>SESIONES DEL FIN DE SEMANA</Text>
+              <Text style={styles.cltNotice}>HORA DE SANTIAGO</Text>
+            </View>
+            {sesiones.length === 0 && (
+              <Text style={[styles.circuitLocation, { marginHorizontal: 16 }]}>No hay sesiones publicadas para este GP.</Text>
+            )}
+            {sesiones.map((session, index) => (
+              <SessionCard key={session.idSesion ?? index} session={session} onPress={() => handleSessionPress(session)} />
             ))}
-          </View>
+
+            {selectedSession && (
+              <View style={styles.resultsModalCard}>
+                <View style={styles.resultsHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.resultsTitle}>RESULTADOS: {selectedSession.tipo || 'Sesión: información no disponible'}</Text>
+                    {displayedResults.rows.length > 0 && <Text style={styles.resultsSubtitle}>Fuente: OpenF1 · sesión {selectedSession.session_key}</Text>}
+                  </View>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar información de sesión" onPress={() => setSelectedSession(null)} style={styles.closeResultsBtn}>
+                    <Ionicons name="close-circle" size={24} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.resultsTableHead}>
+                  <Text style={[styles.thText, { width: 30 }]}>POS</Text>
+                  <Text style={[styles.thText, { flex: 1 }]}>PILOTO</Text>
+                  <Text style={[styles.thText, { width: 75, textAlign: 'right' }]}>TIEMPO</Text>
+                  <Text style={[styles.thText, { width: 65, textAlign: 'right' }]}>DIF</Text>
+                </View>
+                {displayedResults.loading && <Text accessibilityRole="alert" style={styles.circuitLocation}>Consultando resultados publicados...</Text>}
+                {displayedResults.error && <Text accessibilityRole="alert" style={styles.circuitLocation}>Resultados no disponibles: {displayedResults.error}</Text>}
+                {!displayedResults.loading && !displayedResults.error && displayedResults.rows.length === 0 && <Text style={styles.circuitLocation}>
+                  {finished(selectedSession)
+                    ? meeting.source === 'jolpica'
+                    ? 'Resultados oficiales no disponibles en el calendario de Jolpica.'
+                    : 'Resultados confirmados no disponibles para esta sesión.'
+                    : 'El horario publicado no confirma el estado real de la sesión.'}
+                </Text>}
+                {displayedResults.rows.map(row => (
+                  <View key={row.number} style={styles.resultRow}>
+                    <Text style={styles.resultPos}>{row.position ?? '—'}</Text>
+                    <View style={[styles.teamDot, { backgroundColor: row.color }]} />
+                    <View style={styles.pilotInfo}>
+                      <Text style={styles.resultDriver}>{row.driver}</Text>
+                      <Text style={styles.resultTeam}>{row.team}</Text>
+                    </View>
+                    <Text style={styles.resultTime}>{row.time}</Text>
+                    <Text style={[styles.resultGap, row.gap === 'LÍDER' && styles.gapLeader]}>{row.gap}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     </View>
@@ -188,6 +247,8 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   navTitle: {
+    flex: 1,
+    marginHorizontal: 8,
     color: Colors.textPrimary,
     fontSize: 16,
     fontWeight: '800',

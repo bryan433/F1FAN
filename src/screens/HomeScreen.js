@@ -1,50 +1,83 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { Colors } from '../theme/colors';
 import Header from '../components/Header';
 import CountdownTimer from '../components/CountdownTimer';
 import SessionCard from '../components/SessionCard';
 import OfflineBanner from '../components/OfflineBanner';
+import LoadingScreen from '../components/LoadingScreen';
 import F1DataService from '../services/F1DataService';
-import { NEWS_HEADLINES } from '../data/mockData';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function HomeScreen({ navigation }) {
   const [nextRace, setNextRace] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
+  const mounted = useRef(false);
+  const request = useRef(0);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
+    const currentRequest = ++request.current;
+    setLoading(true);
+    setError(null);
+    setNextRace(null);
     try {
       const race = await F1DataService.getNextRace();
+      if (!race || typeof race.disponible !== 'boolean') throw new Error('Respuesta de calendario no válida.');
+      if (!mounted.current || currentRequest !== request.current) return;
       setNextRace(race);
       setIsOffline(F1DataService.isOfflineMode);
-    } catch (e) {
+    } catch (cause) {
+      if (!mounted.current || currentRequest !== request.current) return;
       setIsOffline(true);
+      setError('No se pudo consultar el próximo Gran Premio.');
+    } finally {
+      if (mounted.current && currentRequest === request.current) setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    mounted.current = true;
+    const unsubscribe = F1DataService.subscribeConnectionChange(status => {
+      if (mounted.current) setIsOffline(status);
+    });
     loadData();
-    const unsubscribe = F1DataService.subscribeConnectionChange(setIsOffline);
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      mounted.current = false;
+      request.current += 1;
+      unsubscribe();
+    };
+  }, [loadData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadData();
-    setRefreshing(false);
+    if (mounted.current) setRefreshing(false);
   };
+
+  const hasRace = nextRace?.disponible === true;
+  const sessions = hasRace && Array.isArray(nextRace.sesiones) ? nextRace.sesiones : [];
+  const liveSession = sessions.find(session => session.esLive === true || session.estado === 'En curso');
+  const hasRaceTime = hasRace && typeof nextRace.fechaCarreraUTC === 'string'
+    && nextRace.fechaCarreraUTC.includes('T') && Number.isFinite(new Date(nextRace.fechaCarreraUTC).getTime());
+  const season = hasRace ? nextRace.season ?? nextRace.temporada : null;
+  const raceTitle = nextRace?.nombreOficial || nextRace?.nombreCorto || 'Gran Premio por confirmar';
+  const warning = nextRace?.warning;
 
   return (
     <View style={styles.container}>
       <Header
-        subtitle="TEMPORADA 2024 • EN VIVO"
+        subtitle={season != null ? `TEMPORADA ${season}` : 'CALENDARIO DE FÓRMULA 1'}
         title="Hola, Diego"
         onProfilePress={() => navigation.navigate('Perfil')}
       />
 
-      <OfflineBanner visible={isOffline} />
+      <OfflineBanner
+        visible={Boolean(warning) || (isOffline && hasRace)}
+        message={warning || 'No se ha podido verificar la conexión. Los horarios pueden estar desactualizados.'}
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -53,99 +86,111 @@ export default function HomeScreen({ navigation }) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primaryRed} />
         }
       >
-        {/* Banner y Contador Regresivo */}
-        <CountdownTimer
-          targetDate={nextRace ? nextRace.calcularTiempoRestante() : null}
-          round={nextRace ? nextRace.round : 17}
-          totalRounds={nextRace ? nextRace.totalRounds : 24}
-          location="MARINA BAY - SINGAPUR"
-          onCalendarPress={() => navigation.navigate('Calendario')}
-        />
+        {loading && <LoadingScreen message="Consultando próximo Gran Premio..." />}
 
-        {/* Tarjeta de Sesión en Vivo destacada */}
-        <TouchableOpacity
-          style={styles.liveBanner}
-          onPress={() => navigation.navigate('Live')}
-          activeOpacity={0.85}
-        >
-          <View style={styles.liveHeader}>
-            <View style={styles.liveTag}>
-              <View style={styles.pulseDot} />
-              <Text style={styles.liveTagText}>SESIÓN EN PISTA</Text>
+        {!loading && error && (
+          <View style={styles.liveBanner}>
+            <Text accessibilityRole="alert" style={styles.liveTitle}>{error}</Text>
+            <TouchableOpacity accessibilityRole="button" style={styles.liveButton} onPress={loadData}>
+              <Text style={styles.liveButtonText}>Reintentar</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!loading && !error && nextRace?.disponible === false && (
+          <View style={styles.liveBanner}>
+            <Text style={styles.liveTitle}>
+              {nextRace.estadoConsulta === 'calendario_incompleto' ? 'Calendario incompleto' : 'Sin próxima carrera publicada'}
+            </Text>
+            <Text style={styles.liveSub}>
+              {nextRace.estadoConsulta === 'calendario_incompleto'
+                ? 'Faltan fechas u horarios para identificar con seguridad el próximo Gran Premio.'
+                : 'Vuelve a consultar cuando se publique una próxima carrera.'}
+            </Text>
+            <TouchableOpacity accessibilityRole="button" style={styles.liveButton} onPress={loadData}>
+              <Text style={styles.liveButtonText}>Volver a consultar</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {hasRace && (
+          <>
+            {hasRaceTime ? (
+              <CountdownTimer
+                targetDate={nextRace.fechaCarreraUTC}
+                title={raceTitle}
+                country={nextRace.pais}
+                location={nextRace.circuito?.nombreCircuito}
+                round={nextRace.round}
+                totalRounds={nextRace.totalRounds}
+                onCalendarPress={() => navigation.navigate('Calendario')}
+              />
+            ) : (
+              <View style={styles.liveBanner}>
+                <Text style={styles.liveTitle}>{raceTitle}</Text>
+                {nextRace.circuito?.nombreCircuito ? <Text style={styles.liveSub}>{nextRace.circuito.nombreCircuito}</Text> : null}
+                <Text style={styles.liveSub}>Hora de carrera por confirmar. Cuenta regresiva no disponible.</Text>
+                {nextRace.date ? <Text style={styles.liveSub}>Fecha publicada: {nextRace.date} (UTC)</Text> : null}
+              </View>
+            )}
+
+            <TouchableOpacity
+              accessibilityRole="button"
+              style={[styles.liveButton, { marginHorizontal: 16, marginBottom: 16 }]}
+              onPress={() => navigation.navigate('DetalleGP', { meeting: nextRace })}
+            >
+              <Text style={styles.liveButtonText}>Ver detalle del GP</Text>
+            </TouchableOpacity>
+
+            {liveSession && (
+              <TouchableOpacity accessibilityRole="button" style={styles.liveBanner} onPress={() => navigation.navigate('En Vivo')}>
+                <Text style={styles.liveTagText}>SESIÓN CONFIRMADA EN CURSO</Text>
+                <Text style={styles.liveTitle}>{liveSession.tipo}</Text>
+                <Text style={styles.liveButtonText}>ABRIR EN VIVO</Text>
+              </TouchableOpacity>
+            )}
+
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>SESIONES DEL FIN DE SEMANA</Text>
+              <Text style={styles.sectionSub}>HORA DE SANTIAGO</Text>
             </View>
-            <Text style={styles.liveLap}>VUELTA 12 / 25</Text>
-          </View>
-          <Text style={styles.liveTitle}>Practice 2 • Marina Bay</Text>
-          <Text style={styles.liveSub}>L. Norris lidera con 1:29.812 • Russell P3 a 0.212s</Text>
-          <View style={styles.liveButton}>
-            <Text style={styles.liveButtonText}>ABRIR LIVE TIMING & TELEMETRÍA</Text>
-            <Ionicons name="arrow-forward" size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
-          </View>
-        </TouchableOpacity>
+            {sessions.length === 0 && <Text style={[styles.liveSub, { marginHorizontal: 16 }]}>No hay sesiones publicadas para este GP.</Text>}
+            {sessions.map(session => (
+              <SessionCard
+                key={session.idSesion}
+                session={session}
+                onPress={() => {
+                  if (session.esLive === true || session.estado === 'En curso') {
+                    navigation.navigate('En Vivo');
+                  } else {
+                    navigation.navigate('DetalleGP', { meeting: nextRace });
+                  }
+                }}
+              />
+            ))}
+          </>
+        )}
 
-        {/* Sección de Sesiones del Fin de Semana */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>SESIONES DEL FIN DE SEMANA</Text>
-          <Text style={styles.sectionSub}>HORA DE CHILE (CLT)</Text>
-        </View>
-
-        {nextRace && nextRace.sesiones && nextRace.sesiones.map((session) => (
-          <SessionCard
-            key={session.idSesion}
-            session={session}
-            onPress={() => {
-              if (session.esLive) {
-                navigation.navigate('Live');
-              } else {
-                navigation.navigate('DetalleGP', { meeting: nextRace });
-              }
-            }}
-          />
-        ))}
-
-        {/* Accesos Rápidos según Mockup 01 */}
         <View style={styles.quickAccessRow}>
-          <TouchableOpacity
-            style={styles.quickCard}
-            onPress={() => navigation.navigate('RealidadAumentada')}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity accessibilityRole="button" style={styles.quickCard} onPress={() => navigation.navigate('RealidadAumentada')} activeOpacity={0.8}>
             <Ionicons name="cube-outline" size={20} color={Colors.accentCyan} />
             <Text style={styles.quickTitle}>Ver Circuito en RA</Text>
-            <Text style={styles.quickSub}>3D sobre tu mesa</Text>
+            <Text style={styles.quickSub}>Vista de demostración</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickCard}
-            onPress={() => navigation.navigate('Comparador')}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity accessibilityRole="button" style={styles.quickCard} onPress={() => navigation.navigate('Comparador')} activeOpacity={0.8}>
             <Ionicons name="stats-chart" size={20} color={Colors.accentOrange} />
             <Text style={styles.quickTitle}>Comparador</Text>
-            <Text style={styles.quickSub}>Norris vs Verstappen</Text>
+            <Text style={styles.quickSub}>Estadísticas de pilotos</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Noticias y F1 Insights (Mockup 03 - Editorial) */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>LA HISTORIA DEL FIN DE SEMANA</Text>
+          <Text style={styles.sectionTitle}>GUÍAS Y RECURSOS DE F1</Text>
         </View>
-
-        {NEWS_HEADLINES.map((news) => (
-          <TouchableOpacity
-            key={news.id}
-            style={styles.newsCard}
-            onPress={() => navigation.navigate('Mas')}
-            activeOpacity={0.8}
-          >
-            <View style={styles.newsBadge}>
-              <Text style={styles.newsCategory}>{news.category}</Text>
-              <Text style={styles.newsTime}>{news.time}</Text>
-            </View>
-            <Text style={styles.newsTitle}>{news.title}</Text>
-            <Text style={styles.newsSubtitle}>{news.subtitle}</Text>
-          </TouchableOpacity>
-        ))}
+        <TouchableOpacity accessibilityRole="button" style={styles.newsCard} onPress={() => navigation.navigate('Más')} activeOpacity={0.8}>
+          <Text style={styles.newsTitle}>Explora los recursos de F1Fan</Text>
+          <Text style={styles.newsSubtitle}>Consulta las guías y opciones disponibles.</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );

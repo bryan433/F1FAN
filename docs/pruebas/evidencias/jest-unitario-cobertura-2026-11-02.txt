@@ -1,0 +1,16 @@
+Ejecución local: 2026-11-02 (fecha de consolidación, America/Santiago)
+Comando: npm.cmd test -- --config jest.unit.config.js --coverage --runInBand
+Código de salida: 0
+Transcripción parcial de la salida real observada; no es un log completo de terminal.
+
+All files                   |   85.71 |    84.41 |   87.81 |   85.71 |
+Columnas: % Stmts | % Branch | % Funcs | % Lines
+
+Test Suites: 22 passed, 22 total
+Tests:       225 passed, 225 total
+Snapshots:   0 total
+Time:        6.637 s, estimated 7 s
+Ran all test suites.
+
+Detalle portátil de los archivos medidos y sus conteos: cobertura-unitaria-resumen.json
+Origen: coverage-unit/coverage-final.json regenerado por la ejecución anterior.

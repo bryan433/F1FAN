@@ -20,7 +20,8 @@ export default function LiveScreen({ navigation }) {
     const fetchData = async () => {
       try {
         const live = await F1DataService.getLiveTiming();
-        if (live && live.length > 0) setTimingData(live);
+        // El contrato bruto de /session_result no es el de la torre de demostración.
+        if (Array.isArray(live) && live.length > 0 && live.every(row => row && typeof row.driverCode === 'string')) setTimingData(live);
       } catch (e) {
         setIsOffline(true);
       }
@@ -31,12 +32,13 @@ export default function LiveScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <Header
-        subtitle="MARINA BAY • PRACTICE 2"
+        subtitle="DEMOSTRACIÓN • MARINA BAY"
         title="En Vivo"
         onProfilePress={() => navigation.navigate('Perfil')}
       />
 
       <OfflineBanner visible={isOffline} />
+      <Text accessibilityRole="alert" style={[styles.statusTitle, { padding: 16 }]}>DATOS DE DEMOSTRACIÓN: tiempos, posiciones, telemetría y radio simulados; no son resultados oficiales ni una transmisión en vivo.</Text>
 
       {/* Banner de Estado de Pista */}
       <View style={[styles.trackStatusBanner, safetyCar ? styles.scBanner : styles.greenBanner]}>
@@ -113,7 +115,7 @@ export default function LiveScreen({ navigation }) {
         {/* VISTA 2: MAPA EN VIVO DEL CIRCUITO (Mockup 05) */}
         {activeTab === 'mapa' && (
           <View>
-            <TrackMap circuitName="MARINA BAY STREET CIRCUIT" isLive={true} />
+            <TrackMap circuitName="MARINA BAY STREET CIRCUIT" isLive={true} isDemo={true} />
             <TelemetryWidget
               driverName="G. RUSSELL"
               teamName="Mercedes"

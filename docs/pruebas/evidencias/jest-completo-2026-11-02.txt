@@ -1,0 +1,40 @@
+Ejecución local: 2026-11-02 (fecha de consolidación, America/Santiago)
+Comando: npm.cmd test -- --runInBand
+Código de salida: 0
+Salida de Jest capturada en esta ejecución; se omite la salida ajena al comando.
+
+PASS __tests__/screens/FavoritesSync.test.js (11.401 s)
+PASS __tests__/screens/ChampionshipScreens.test.js
+PASS __tests__/screens/CalendarioScreen.test.js
+PASS __tests__/screens/HistorialWebScreen.test.js
+PASS __tests__/screens/HomeScreen.test.js
+PASS __tests__/components/RaceCard.test.js
+PASS __tests__/components/OfflineBanner.test.js
+PASS __tests__/components/CountdownTimer.test.js
+PASS __tests__/components/SessionCard.test.js
+PASS __tests__/screens/DetalleGPScreen.test.js
+PASS __tests__/screens/ARScreen.test.js
+PASS __tests__/components/TrackMap.test.js
+PASS __tests__/components/StandingsTable.test.js
+PASS __tests__/components/LoadingScreen.test.js
+PASS __tests__/components/DriverCard.test.js
+PASS __tests__/components/TelemetryWidget.test.js
+PASS __tests__/services/F1DataService.test.js
+PASS __tests__/services/F1ChampionshipStandings.test.js
+PASS __tests__/storage/FavoriteDriversCollection.test.js
+PASS __tests__/services/JolpicaService.test.js
+PASS __tests__/services/JolpicaCalendarAdapter.test.js
+PASS __tests__/storage/LocalStorageManager.test.js
+PASS __tests__/utils/favorites.test.js
+PASS __tests__/models/GranPremio.test.js
+PASS __tests__/storage/FavoritesCompatibility.test.js
+PASS __tests__/models/Piloto.test.js
+PASS __tests__/utils/timezone.test.js
+PASS __tests__/models/Sesion.test.js
+PASS __tests__/models/Escuderia.test.js
+
+Test Suites: 29 passed, 29 total
+Tests:       330 passed, 330 total
+Snapshots:   0 total
+Time:        30.418 s
+Ran all test suites.

@@ -17,22 +17,26 @@ export default function ARScreen({ navigation }) {
   const handleRecordClip = () => {
     setIsRecording(!isRecording);
     if (!isRecording) {
-      Alert.alert('Grabación AR', 'Grabando clip de realidad aumentada...');
+      Alert.alert('Grabación simulada', 'Demostración de grabación: no se genera ni guarda un video real.');
       setTimeout(() => {
         setIsRecording(false);
-        Alert.alert('Clip guardado', 'Tu video de RA se ha guardado en la galería local.');
+        Alert.alert('Simulación finalizada', 'La demostración no ha grabado ni guardado archivos.');
       }, 3000);
     }
   };
 
   return (
     <View style={styles.container}>
+      <View style={styles.demoBanner}>
+        <Text accessibilityRole="header" style={styles.demoTitle}>SIMULACIÓN AR — DATOS DE DEMOSTRACIÓN</Text>
+        <Text style={styles.demoText}>Marina Bay es un circuito de demostración independiente del GP seleccionado. Pilotos, vueltas, posiciones y velocidades son simulados; no son datos oficiales.</Text>
+      </View>
       {/* MODO 1: ESCANEO Y ESCALA (Mockup 07) */}
       {arStep === 'scan' ? (
         <View style={styles.scanContainer}>
           {/* Header */}
           <View style={styles.arHeader}>
-            <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar simulación AR" style={styles.closeBtn} onPress={() => navigation.goBack()}>
               <Ionicons name="close" size={24} color={Colors.textPrimary} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Calibración AR</Text>
@@ -49,7 +53,7 @@ export default function ARScreen({ navigation }) {
               <Ionicons name="scan-outline" size={48} color={Colors.accentCyan} />
             </View>
             <Text style={styles.instructionText}>
-              Mueve el teléfono suavemente para detectar la mesa o superficie plana
+              Simula la colocación del circuito sobre una mesa o superficie plana
             </Text>
           </View>
 
@@ -60,6 +64,8 @@ export default function ARScreen({ navigation }) {
               {['1:50', '1:100', '1:200'].map((sc) => (
                 <TouchableOpacity
                   key={sc}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: scale === sc }}
                   style={[styles.scalePill, scale === sc && styles.scalePillActive]}
                   onPress={() => setScale(sc)}
                 >
@@ -71,7 +77,7 @@ export default function ARScreen({ navigation }) {
             </View>
 
             {/* Botón Colocar Circuito */}
-            <TouchableOpacity style={styles.placeBtn} onPress={handlePlaceCircuit} activeOpacity={0.8}>
+            <TouchableOpacity accessibilityRole="button" style={styles.placeBtn} onPress={handlePlaceCircuit} activeOpacity={0.8}>
               <Text style={styles.placeBtnText}>COLOCAR CIRCUITO</Text>
             </TouchableOpacity>
           </View>
@@ -81,20 +87,21 @@ export default function ARScreen({ navigation }) {
         <View style={styles.tableContainer}>
           {/* Header con Indicador de Sesión */}
           <View style={styles.tableHeader}>
-            <TouchableOpacity style={styles.closeBtn} onPress={() => setArStep('scan')}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver a colocar el circuito" style={styles.closeBtn} onPress={() => setArStep('scan')}>
               <Ionicons name="scan" size={20} color={Colors.textPrimary} />
             </TouchableOpacity>
             <View style={styles.arLiveTag}>
-              <View style={styles.liveDot} />
-              <Text style={styles.arLiveText}>AR LIVE • MARINA BAY • L24/62</Text>
+              <Text style={styles.arLiveText}>DEMO AR • MARINA BAY</Text>
             </View>
-            <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar simulación AR" style={styles.closeBtn} onPress={() => navigation.goBack()}>
               <Ionicons name="close" size={22} color={Colors.textPrimary} />
             </TouchableOpacity>
           </View>
 
           {/* Torre pequeña de líderes AR (Mockup 06) */}
           <View style={styles.miniTower}>
+            <Text style={styles.miniGap}>CLASIFICACIÓN SIMULADA</Text>
+            <Text style={styles.miniGap}>VUELTA SIMULADA 24/62</Text>
             <Text style={styles.miniTowerRow}>1. VER <Text style={styles.miniGap}>LÍDER</Text></Text>
             <Text style={styles.miniTowerRow}>2. NOR <Text style={styles.miniGap}>+1.2s</Text></Text>
             <Text style={[styles.miniTowerRow, { color: Colors.accentCyan }]}>
@@ -104,7 +111,7 @@ export default function ARScreen({ navigation }) {
 
           {/* Renderizado 3D / Trazado sobre la mesa */}
           <View style={styles.tableTrackCanvas}>
-            <TrackMap circuitName="SIMULACIÓN AR EN TU MESA" isLive={true} />
+            <TrackMap circuitName="MARINA BAY • DEMOSTRACIÓN" isLive={true} isDemo={true} />
           </View>
 
           {/* HUD de Telemetría Flotante (Mockup 06) */}
@@ -113,11 +120,11 @@ export default function ARScreen({ navigation }) {
               <View style={styles.favStarBadge}>
                 <Ionicons name="star" size={10} color="#000000" />
               </View>
-              <Text style={styles.arDriverName}>RUSSELL #63</Text>
+              <Text style={styles.arDriverName}>RUSSELL #63 · DEMO</Text>
             </View>
             <View style={styles.arSpeedRow}>
               <Text style={styles.arSpeedVal}>294.06</Text>
-              <Text style={styles.arSpeedUnit}>KM/H</Text>
+              <Text style={styles.arSpeedUnit}>KM/H SIMULADOS</Text>
             </View>
           </View>
 
@@ -125,12 +132,14 @@ export default function ARScreen({ navigation }) {
           <View style={styles.bottomControls}>
             <View style={styles.modeTabs}>
               {[
-                { key: 'realtime', label: 'TIEMPO REAL' },
-                { key: 'replay', label: 'REPLAY' },
-                { key: 'gaps', label: 'GAPS 3D' }
+                { key: 'realtime', label: 'ANIMACIÓN DEMO' },
+                { key: 'replay', label: 'REPLAY DEMO' },
+                { key: 'gaps', label: 'GAPS 3D DEMO' }
               ].map(mode => (
                 <TouchableOpacity
                   key={mode.key}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: arMode === mode.key }}
                   style={[styles.modeTab, arMode === mode.key && styles.modeTabActive]}
                   onPress={() => setArMode(mode.key)}
                 >
@@ -142,13 +151,14 @@ export default function ARScreen({ navigation }) {
             </View>
 
             <TouchableOpacity
+              accessibilityRole="button"
               style={[styles.recordBtn, isRecording && styles.recordBtnActive]}
               onPress={handleRecordClip}
               activeOpacity={0.8}
             >
               <Ionicons name={isRecording ? 'stop-circle' : 'videocam'} size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
               <Text style={styles.recordBtnText}>
-                {isRecording ? 'GRABANDO...' : 'Grabar clip AR'}
+                {isRecording ? 'SIMULANDO...' : 'Simular clip AR'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -162,6 +172,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#050709',
+  },
+  demoBanner: {
+    backgroundColor: '#332712',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.accentYellow,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  demoTitle: {
+    color: Colors.accentYellow,
+    fontSize: 13,
+    fontWeight: '900',
+    marginBottom: 4,
+  },
+  demoText: {
+    color: Colors.textPrimary,
+    fontSize: 12,
+    lineHeight: 17,
   },
   scanContainer: {
     flex: 1,
@@ -285,7 +313,7 @@ const styles = StyleSheet.create({
   arLiveTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(225, 6, 0, 0.25)',
+    backgroundColor: 'rgba(0, 210, 190, 0.15)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
@@ -298,7 +326,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   arLiveText: {
-    color: '#FF6B6B',
+    color: Colors.accentCyan,
     fontSize: 11,
     fontWeight: '900',
   },

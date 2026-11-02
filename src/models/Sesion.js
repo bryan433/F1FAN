@@ -1,4 +1,4 @@
-import { formatToChileTime } from '../utils/timezone';
+import { getChileDateTimeParts } from '../utils/timezone';
 
 /**
  * Entidad Sesion - Modelo del Dominio F1Fan
@@ -11,9 +11,13 @@ export class Sesion {
     idMeeting = null,
     tipo, // 'Practice 1', 'Practice 2', 'Practice 3', 'Qualifying', 'Sprint', 'Race'
     fechaHoraUTC,
-    estado = 'Programada', // 'Programada', 'En curso', 'Finalizada', 'Cancelada', 'Resultados disponibles'
+    estado = 'Estado no confirmado',
     vueltaActual = null,
-    totalVueltas = null
+    totalVueltas = null,
+    date = null,
+    time = null,
+    sourceKey = null,
+    esLive = false,
   }) {
     this.idSesion = idSesion;
     this.idMeeting = idMeeting;
@@ -22,10 +26,18 @@ export class Sesion {
     this.estado = estado;
     this.vueltaActual = vueltaActual;
     this.totalVueltas = totalVueltas;
+    this.date = date;
+    this.time = time;
+    this.sourceKey = sourceKey;
+    this.esLive = esLive;
+    const local = fechaHoraUTC ? getChileDateTimeParts(fechaHoraUTC) : null;
+    this.dia = local?.dia ?? null;
+    this.horaChile = local?.horaChile ?? null;
+    this.fechaChile = local?.fechaChile ?? null;
   }
 
   obtenerHoraLocal() {
-    return formatToChileTime(this.fechaHoraUTC);
+    return this.horaChile;
   }
 }
 
