@@ -46,7 +46,8 @@ export default function PerfilScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.navBar}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver"
+          style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.navTitle}>Perfil & Ajustes</Text>
@@ -106,6 +107,8 @@ export default function PerfilScreen({ navigation }) {
               <Text style={styles.settingDesc}>Habilita telemetría detallada y micro-sectores</Text>
             </View>
             <Switch
+              accessibilityRole="switch"
+              accessibilityLabel="Modo Experto"
               value={settings.modoExperto}
               onValueChange={() => handleToggle('modoExperto')}
               trackColor={{ false: Colors.backgroundDark, true: Colors.accentCyan }}
@@ -119,6 +122,8 @@ export default function PerfilScreen({ navigation }) {
               <Text style={styles.settingDesc}>Oculta posiciones y podios hasta abrir la carrera</Text>
             </View>
             <Switch
+              accessibilityRole="switch"
+              accessibilityLabel="Evitar Spoilers"
               value={settings.evitarSpoilers}
               onValueChange={() => handleToggle('evitarSpoilers')}
               trackColor={{ false: Colors.backgroundDark, true: Colors.accentCyan }}
@@ -132,6 +137,8 @@ export default function PerfilScreen({ navigation }) {
               <Text style={styles.settingDesc}>Ajuste automático según HU-02 a Santiago</Text>
             </View>
             <Switch
+              accessibilityRole="switch"
+              accessibilityLabel="Hora Local de Chile (CLT)"
               value={settings.horaChilenaActivada}
               onValueChange={() => handleToggle('horaChilenaActivada')}
               trackColor={{ false: Colors.backgroundDark, true: Colors.accentGreen }}

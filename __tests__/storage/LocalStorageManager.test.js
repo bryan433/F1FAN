@@ -296,15 +296,19 @@ describe('LocalStorageManager', () => {
     // PRUEBAS DE ESCUDERÍAS FAVORITAS
     // ==========================================
 
-    test('recupera escuderías predeterminadas si los datos están corruptos', async () => {
+    test('informa el fallo sin inventar escuderías si los datos están corruptos', async () => {
+        const aviso = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
         await AsyncStorage.setItem(
             '@f1fan_favorite_teams',
             'JSON inválido'
         );
 
-        const equipos = await LocalStorageManager.obtenerEscuderiasFavoritas();
+        await expect(
+            LocalStorageManager.obtenerEscuderiasFavoritas()
+        ).rejects.toThrow('No se pudieron leer las escuderías favoritas guardadas.');
 
-        expect(equipos).toEqual(['mercedes', 'mclaren']);
+        expect(aviso).toHaveBeenCalled();
     });
 
     test('maneja errores al modificar escuderías favoritas', async () => {

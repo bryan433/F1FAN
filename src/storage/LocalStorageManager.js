@@ -50,6 +50,14 @@ function teamIds(raw) {
   }))];
 }
 
+const AJUSTES_PREDETERMINADOS = {
+  modoExperto: false,
+  evitarSpoilers: false,
+  unidades: 'km/h', // 'km/h' o 'mph'
+  horaChilenaActivada: true,
+};
+const ALERTAS_PREDETERMINADAS = { boxes: true, radio: true, safetyCar: true };
+
 // Serializa cambios de preferencias para no perder una selección al pulsar rápido.
 let preferenceWrite = Promise.resolve();
 const preferenceListeners = new Set();
@@ -232,12 +240,15 @@ class LocalStorageManager {
 
   /**
    * Gestión de Escuderías Favoritas
+   * Nunca inventa favoritas: si la lectura falla o lo guardado no es válido, la promesa
+   * se rechaza para que cada pantalla informe el problema.
    */
   async obtenerEscuderiasFavoritas() {
     try {
       return teamIds(await AsyncStorage.getItem(LocalStorageManager.FAVORITE_TEAMS_KEY));
-    } catch (e) {
-      return ['mercedes', 'mclaren'];
+    } catch (error) {
+      console.warn('[LocalStorageManager] Error al obtener escuderías favoritas:', error);
+      throw new Error('No se pudieron leer las escuderías favoritas guardadas.');
     }
   }
 
@@ -262,31 +273,35 @@ class LocalStorageManager {
   }
 
   /**
+   * Lectura interna de ajustes o alertas. Un fallo de AsyncStorage se propaga para no
+   * confundir "no se pudo leer" con "no hay nada guardado"; sin valor guardado o con
+   * JSON corrupto se usan los valores predeterminados.
+   */
+  async _leerPreferencia(clave, predeterminados) {
+    const data = await AsyncStorage.getItem(clave);
+    if (!data) return { ...predeterminados };
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      return { ...predeterminados };
+    }
+  }
+
+  /**
    * Gestión de Ajustes de Usuario (Modo Experto, Anti-Spoilers, Unidades)
    */
   async obtenerAjustes() {
     try {
-      const data = await AsyncStorage.getItem(LocalStorageManager.SETTINGS_KEY);
-      if (data) return JSON.parse(data);
-      return {
-        modoExperto: false,
-        evitarSpoilers: false,
-        unidades: 'km/h', // 'km/h' o 'mph'
-        horaChilenaActivada: true,
-      };
+      return await this._leerPreferencia(LocalStorageManager.SETTINGS_KEY, AJUSTES_PREDETERMINADOS);
     } catch (e) {
-      return {
-        modoExperto: false,
-        evitarSpoilers: false,
-        unidades: 'km/h',
-        horaChilenaActivada: true,
-      };
+      return { ...AJUSTES_PREDETERMINADOS };
     }
   }
 
   async guardarAjustes(nuevosAjustes) {
     try {
-      const actual = await this.obtenerAjustes();
+      // Si la lectura falla no se escribe: los predeterminados pisarían los ajustes reales.
+      const actual = await this._leerPreferencia(LocalStorageManager.SETTINGS_KEY, AJUSTES_PREDETERMINADOS);
       const updated = { ...actual, ...nuevosAjustes };
       await AsyncStorage.setItem(LocalStorageManager.SETTINGS_KEY, JSON.stringify(updated));
       return updated;
@@ -300,21 +315,16 @@ class LocalStorageManager {
    */
   async obtenerAlertas() {
     try {
-      const data = await AsyncStorage.getItem(LocalStorageManager.ALERTS_KEY);
-      if (data) return JSON.parse(data);
-      return {
-        boxes: true,
-        radio: true,
-        safetyCar: true,
-      };
+      return await this._leerPreferencia(LocalStorageManager.ALERTS_KEY, ALERTAS_PREDETERMINADAS);
     } catch (e) {
-      return { boxes: true, radio: true, safetyCar: true };
+      return { ...ALERTAS_PREDETERMINADAS };
     }
   }
 
   async guardarAlertas(nuevasAlertas) {
     try {
-      const actual = await this.obtenerAlertas();
+      // Si la lectura falla no se escribe: los predeterminados pisarían las alertas reales.
+      const actual = await this._leerPreferencia(LocalStorageManager.ALERTS_KEY, ALERTAS_PREDETERMINADAS);
       const updated = { ...actual, ...nuevasAlertas };
       await AsyncStorage.setItem(LocalStorageManager.ALERTS_KEY, JSON.stringify(updated));
       return updated;

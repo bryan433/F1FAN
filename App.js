@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StyleSheet, View } from 'react-native';
 import AppNavigator from './src/navigation/AppNavigator';
+import ErrorBoundary from './src/components/ErrorBoundary';
 import { Colors } from './src/theme/colors';
 
 export default function App() {
@@ -11,7 +12,10 @@ export default function App() {
       <View style={styles.container}>
         <StatusBar style="light" backgroundColor={Colors.background} />
         <SafeAreaView style={styles.safeArea} edges={['top']}>
-          <AppNavigator />
+          {/* Un fallo de render en una pantalla no desmonta toda la aplicación. */}
+          <ErrorBoundary>
+            <AppNavigator />
+          </ErrorBoundary>
         </SafeAreaView>
       </View>
     </SafeAreaProvider>

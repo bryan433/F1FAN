@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 export default function FavoritosScreen({ navigation }) {
   const [favoriteRecords, setFavoriteRecords] = useState([]);
   const [favoriteTeams, setFavoriteTeams] = useState([]);
+  const [teamsReadError, setTeamsReadError] = useState(false);
   const [catalog, setCatalog] = useState({ drivers: [], teams: [] });
   const [loading, setLoading] = useState(true);
   const [lookupWarning, setLookupWarning] = useState(false);
@@ -23,11 +24,14 @@ export default function FavoritosScreen({ navigation }) {
   const loadPreferences = useCallback(async () => {
     const request = ++preferenceRequest.current;
     const [records, teams] = await Promise.all([
-      LocalStorageManager.obtenerDetalleFavoritos(), LocalStorageManager.obtenerEscuderiasFavoritas(),
+      LocalStorageManager.obtenerDetalleFavoritos(),
+      // Si no se pueden leer las escuderías no se inventan: se informa el fallo.
+      LocalStorageManager.obtenerEscuderiasFavoritas().catch(() => null),
     ]);
     if (mounted.current && request === preferenceRequest.current) {
       setFavoriteRecords(records);
-      setFavoriteTeams(teams);
+      setFavoriteTeams(teams ?? []);
+      setTeamsReadError(teams === null);
     }
   }, []);
 
@@ -148,7 +152,8 @@ export default function FavoritosScreen({ navigation }) {
         </View>
 
         <View style={styles.teamsChipRow}>
-          {!loading && !favoriteTeamItems.length && <Text style={styles.favSub}>No tienes escuderías favoritas guardadas.</Text>}
+          {teamsReadError && <Text accessibilityRole="alert" style={styles.favSub}>No se pudieron leer tus escuderías favoritas guardadas.</Text>}
+          {!loading && !teamsReadError && !favoriteTeamItems.length && <Text style={styles.favSub}>No tienes escuderías favoritas guardadas.</Text>}
           {favoriteTeamItems.map((team) => (
             <View key={team.id} style={[styles.teamChip, { borderColor: team.color }]}>
               <View style={[styles.chipDot, { backgroundColor: team.color }]} />
@@ -176,6 +181,8 @@ export default function FavoritosScreen({ navigation }) {
               </View>
             </View>
             <Switch
+              accessibilityRole="switch"
+              accessibilityLabel="Mi piloto entra a boxes"
               value={alerts.boxes}
               onValueChange={() => toggleAlert('boxes')}
               trackColor={{ false: Colors.backgroundDark, true: Colors.accentCyan }}
@@ -192,6 +199,8 @@ export default function FavoritosScreen({ navigation }) {
               </View>
             </View>
             <Switch
+              accessibilityRole="switch"
+              accessibilityLabel="Radio de mi piloto"
               value={alerts.radio}
               onValueChange={() => toggleAlert('radio')}
               trackColor={{ false: Colors.backgroundDark, true: Colors.accentCyan }}
@@ -208,6 +217,8 @@ export default function FavoritosScreen({ navigation }) {
               </View>
             </View>
             <Switch
+              accessibilityRole="switch"
+              accessibilityLabel="Bandera roja o Safety Car"
               value={alerts.safetyCar}
               onValueChange={() => toggleAlert('safetyCar')}
               trackColor={{ false: Colors.backgroundDark, true: Colors.accentCyan }}
@@ -224,6 +235,8 @@ export default function FavoritosScreen({ navigation }) {
               </View>
             </View>
             <Switch
+              accessibilityRole="switch"
+              accessibilityLabel="Cada cambio de líder"
               value={alerts.leaderChange}
               onValueChange={() => toggleAlert('leaderChange')}
               trackColor={{ false: Colors.backgroundDark, true: Colors.accentCyan }}
