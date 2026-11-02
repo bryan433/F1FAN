@@ -4,6 +4,11 @@
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:unit": "jest --config jest.unit.config.js",
+    "test:unit:coverage": "jest --config jest.unit.config.js --coverage",
+    "test:ci": "jest --ci --maxWorkers=2 --coverage",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
