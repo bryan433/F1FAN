@@ -12,7 +12,8 @@ Versión 0.3. Revisión documental: 2026-11-02, America/Santiago. Plazo informad
 - [x] [EvidenciasIntegracion.md](EvidenciasIntegracion.md): HTTP 200 informado, caché con mocks y límites de la verificación externa.
 - [x] Plantilla original [Plan_Maestro_Pruebas_Software.docx](../referencias/Plan_Maestro_Pruebas_Software.docx) revisada y conservada.
 - [ ] SRS completo/versionado incorporado o accesible al revisor. No se encontró en el repositorio; README/comentarios son referencias parciales.
-- [ ] Nombres de los tres integrantes, asignación real, revisión cruzada y aprobación registrados. No fueron proporcionados.
+- [x] Nombres de los integrantes y asignación registrados: Bryan Ahumada (Frontend Lead, QA & CI), Nicolás Salas (Scrum Master, Casos de Prueba & Manual QA), Alexander Donoso (Desarrollo Multiplataforma & AsyncStorage).
+- [x] [EntregaQABryan.md](EntregaQABryan.md): reporte de configuración Jest, pruebas de componentes complejos y pipeline GitHub Actions.
 
 ## 2. Resultados y reportes verificados
 
@@ -33,7 +34,7 @@ Versión 0.3. Revisión documental: 2026-11-02, America/Santiago. Plazo informad
 - [x] Informes locales coverage-unit/ regenerados: HTML, coverage-final.json y LCOV.
 - [ ] Adjuntar/exportar coverage-unit/ completo si el formato de entrega exige HTML/LCOV además del resumen portátil. No se copió el árbol HTML entero a docs/.
 - [x] Producción, tests, dependencias y configuración preservados durante esta tarea documental.
-- [ ] Registrar revisión/commit de entrega y comprobar inclusión real de archivos en el repositorio del equipo. No se realizó commit/push.
+- [x] Registrar revisión/commit de entrega y comprobar inclusión real de archivos en el repositorio del equipo (`feature/qa-jest-ci-bryan` subido con éxito al repositorio remoto en GitHub).
 
 ## 3. Capturas y evidencias manuales
 
@@ -65,7 +66,7 @@ Versión 0.3. Revisión documental: 2026-11-02, America/Santiago. Plazo informad
 | RNF-01, <3 s, README | Sin medición | Protocolo y MAN-004; duración de Jest no sirve para este requisito |
 | RNF-02, límite OpenF1, README | Sin prueba específica | No sustituir por deduplicación Jolpica |
 | E2E con POM, plantilla | **No implementado** | Declarar brecha; implementar/obtener evidencia si se exige, sin asumir dispensa |
-| CI/CD, quality gates, plantilla | **No implementado** | Declarar brecha; sin logs, PR checks, nightly o staging inventados |
+| CI/CD, quality gates, plantilla | **Implementado** con GitHub Actions | Pipeline configurado en `.github/workflows/ci.yml` (test unitarios, cobertura y test CI con artefactos) |
 
 Los IDs AUT/MAN/VIS/INT organizan pruebas/evidencias, no requisitos. La matriz usa únicamente HU-02, CU-02, CU-06, RNF-PER-01/02 y RNF-01/02 respaldados por README/comentarios, con sus límites. SD-03 aún describe un favorito único y no sustituye el requisito actual ni un SRS oficial.
 
