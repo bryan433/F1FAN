@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Text, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, Text, TouchableOpacity, Alert, TextInput } from 'react-native';
 import { Colors } from '../theme/colors';
 import Header from '../components/Header';
 import StandingsTable from '../components/StandingsTable';
@@ -15,6 +15,7 @@ export default function ClasificacionScreen({ navigation, route }) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [favoriteRecords, setFavoriteRecords] = useState([]);
   const [favoriteTeams, setFavoriteTeams] = useState([]);
   const [teamsReadError, setTeamsReadError] = useState(false);
@@ -111,6 +112,24 @@ export default function ClasificacionScreen({ navigation, route }) {
   )) ?? [];
   const teams = snapshot?.teams.data.map(team => ({ ...team, esFavorito: favoriteTeams.includes(String(team.idEscuderia).toLowerCase()) })) ?? [];
 
+  const query = searchQuery.trim().toLowerCase();
+  const filteredDrivers = query
+    ? drivers.filter(d => {
+        const full = `${d.nombre || ''} ${d.apellido || ''}`.toLowerCase();
+        const code = (d.codigo || '').toLowerCase();
+        const team = (d.nombreEscuderia || d.teamName || '').toLowerCase();
+        const num = String(d.numero || '');
+        return full.includes(query) || code.includes(query) || team.includes(query) || num === query;
+      })
+    : drivers;
+
+  const filteredTeams = query
+    ? teams.filter(t => {
+        const name = (t.name || t.nombre || t.idEscuderia || '').toLowerCase();
+        return name.includes(query);
+      })
+    : teams;
+
   const tableStatus = (label, table) => {
     const origin = table.origin === 'api' ? 'API' : table.origin === 'cache' ? 'caché local' : 'última copia guardada';
     return (
@@ -139,6 +158,32 @@ export default function ClasificacionScreen({ navigation, route }) {
           <Text style={styles.compareBtnText}>Comparar</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Barra de Filtro en Vivo */}
+      <View style={styles.searchBarContainer}>
+        <Ionicons name="search-outline" size={15} color={Colors.textSecondary} style={{ marginRight: 8 }} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Filtrar piloto o escudería..."
+          placeholderTextColor={Colors.textMuted}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
+          accessibilityLabel="Filtrar tabla de clasificación"
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Limpiar filtro de clasificación"
+            onPress={() => setSearchQuery('')}
+            style={{ padding: 4 }}
+          >
+            <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
       {loading ? <LoadingScreen message="Consultando posiciones..." /> : (
         <ScrollView style={styles.scrollArea}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primaryRed} />}>
@@ -151,7 +196,7 @@ export default function ClasificacionScreen({ navigation, route }) {
                 <Text accessibilityRole="alert" style={styles.seasonText}>No se pudieron leer tus escuderías favoritas guardadas.</Text>
               </View>
             )}
-            <StandingsTable drivers={drivers} teams={teams}
+            <StandingsTable drivers={filteredDrivers} teams={filteredTeams}
               onDriverPress={driver => navigation.navigate('PerfilPiloto', { driverId: driver.idPiloto, driver })}
               onToggleFavorite={handleToggleFavorite} onToggleTeamFavorite={handleToggleTeamFavorite} />
           </>}
@@ -174,7 +219,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingTop: 10,
+    paddingBottom: 6,
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 10,
+    height: 38,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    color: Colors.textPrimary,
+    fontSize: 12,
+    paddingVertical: 0,
   },
   seasonBadge: {
     flexDirection: 'row',

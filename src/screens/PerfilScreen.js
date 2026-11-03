@@ -21,6 +21,7 @@ export default function PerfilScreen({ navigation }) {
     polesAcertadas: 12,
     aniosFan: 9
   });
+  const [favoritesStats, setFavoritesStats] = useState({ drivers: 0, teams: 0 });
 
   // Estado del modal de autenticación con Supabase
   const [modalVisible, setModalVisible] = useState(false);
@@ -44,6 +45,16 @@ export default function PerfilScreen({ navigation }) {
           isGuest: Boolean(currentUser.isGuest)
         }));
       }
+      try {
+        const [records, teams] = await Promise.all([
+          LocalStorageManager.obtenerDetalleFavoritos(),
+          LocalStorageManager.obtenerEscuderiasFavoritas().catch(() => [])
+        ]);
+        setFavoritesStats({
+          drivers: Array.isArray(records) ? records.length : 0,
+          teams: Array.isArray(teams) ? teams.length : 0
+        });
+      } catch {}
     };
     loadSettings();
   }, []);
@@ -205,18 +216,26 @@ export default function PerfilScreen({ navigation }) {
             <Text style={styles.metricLbl}>CARRERAS VISTAS</Text>
           </View>
           <View style={styles.metricItem}>
-            <Text style={[styles.metricVal, { color: Colors.accentYellow }]}>{user.polesAcertadas}</Text>
-            <Text style={styles.metricLbl}>POLES ACERTADAS</Text>
+            <Text style={[styles.metricVal, { color: Colors.accentYellow }]}>
+              {favoritesStats.drivers > 0 ? favoritesStats.drivers : user.polesAcertadas}
+            </Text>
+            <Text style={styles.metricLbl}>
+              {favoritesStats.drivers > 0 ? 'PILOTOS FAV' : 'POLES ACERTADAS'}
+            </Text>
           </View>
           <View style={styles.metricItem}>
-            <Text style={[styles.metricVal, { color: Colors.accentCyan }]}>{user.aniosFan}</Text>
-            <Text style={styles.metricLbl}>AÑOS FAN</Text>
+            <Text style={[styles.metricVal, { color: Colors.accentCyan }]}>
+              {favoritesStats.teams > 0 ? favoritesStats.teams : user.aniosFan}
+            </Text>
+            <Text style={styles.metricLbl}>
+              {favoritesStats.teams > 0 ? 'ESCUDERÍAS FAV' : 'AÑOS FAN'}
+            </Text>
           </View>
         </View>
 
         {/* Actividad en Temporada (Mockup 13) */}
         <View style={styles.activityCard}>
-          <Text style={styles.cardHeading}>ACTIVIDAD EN TEMPORADA 2024</Text>
+          <Text style={styles.cardHeading}>ACTIVIDAD EN EL CAMPEONATO 2026</Text>
           <View style={styles.barsContainer}>
             {[40, 65, 80, 50, 95, 70, 85, 60, 90, 75, 80, 100].map((h, i) => (
               <View key={i} style={styles.barCol}>
@@ -294,65 +313,126 @@ export default function PerfilScreen({ navigation }) {
       <Modal
         visible={modalVisible}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            {/* Barra superior de acento F1 */}
+            <View style={styles.modalAccentBar} />
+
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {isRegister ? 'Crear Cuenta Supabase' : 'Iniciar Sesión'}
-              </Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color={Colors.textSecondary} />
+              <View style={styles.modalTitleRow}>
+                <View style={styles.modalCloudBadge}>
+                  <Ionicons name="cloud" size={16} color={Colors.primaryRed} />
+                </View>
+                <Text style={styles.modalTitle}>
+                  {isRegister ? 'Crear Cuenta Supabase' : 'Iniciar Sesión'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar modal de autenticación"
+                onPress={() => setModalVisible(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={20} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
             <Text style={styles.modalSubtitle}>
-              Conecta tu cuenta para sincronizar tus pilotos y escuderías favoritas en la nube y verlos en la web.
+              Conecta tu cuenta para sincronizar tus favoritos en la nube de Supabase y acceder a ellos en tiempo real.
             </Text>
 
+            {/* Segmented Tab Switcher */}
+            <View style={styles.modalSegmentContainer}>
+              <TouchableOpacity
+                style={[styles.modalSegmentTab, !isRegister && styles.modalSegmentTabActive]}
+                onPress={() => setIsRegister(false)}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="log-in-outline"
+                  size={15}
+                  color={!isRegister ? Colors.primaryRed : Colors.textSecondary}
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={[styles.modalSegmentText, !isRegister && styles.modalSegmentTextActive]}>
+                  Ingresar
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSegmentTab, isRegister && styles.modalSegmentTabActive]}
+                onPress={() => setIsRegister(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="person-add-outline"
+                  size={15}
+                  color={isRegister ? Colors.primaryRed : Colors.textSecondary}
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={[styles.modalSegmentText, isRegister && styles.modalSegmentTextActive]}>
+                  Registrarse
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Form Inputs */}
             {isRegister && (
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Nombre o apodo"
-                placeholderTextColor={Colors.textMuted}
-                value={nombreInput}
-                onChangeText={setNombreInput}
-                autoCapitalize="words"
-              />
+              <View style={styles.modalInputWrapper}>
+                <Ionicons name="person-outline" size={17} color={Colors.textSecondary} style={styles.modalInputIcon} />
+                <TextInput
+                  style={styles.modalInputField}
+                  placeholder="Nombre o apodo"
+                  placeholderTextColor={Colors.textMuted}
+                  value={nombreInput}
+                  onChangeText={setNombreInput}
+                  autoCapitalize="words"
+                />
+              </View>
             )}
 
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Correo electrónico"
-              placeholderTextColor={Colors.textMuted}
-              value={emailInput}
-              onChangeText={setEmailInput}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
+            <View style={styles.modalInputWrapper}>
+              <Ionicons name="mail-outline" size={17} color={Colors.textSecondary} style={styles.modalInputIcon} />
+              <TextInput
+                style={styles.modalInputField}
+                placeholder="Correo electrónico"
+                placeholderTextColor={Colors.textMuted}
+                value={emailInput}
+                onChangeText={setEmailInput}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+            </View>
 
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Contraseña"
-              placeholderTextColor={Colors.textMuted}
-              value={passwordInput}
-              onChangeText={setPasswordInput}
-              secureTextEntry={true}
-            />
+            <View style={styles.modalInputWrapper}>
+              <Ionicons name="lock-closed-outline" size={17} color={Colors.textSecondary} style={styles.modalInputIcon} />
+              <TextInput
+                style={styles.modalInputField}
+                placeholder="Contraseña"
+                placeholderTextColor={Colors.textMuted}
+                value={passwordInput}
+                onChangeText={setPasswordInput}
+                secureTextEntry={true}
+              />
+            </View>
 
             <TouchableOpacity
               style={styles.modalSubmitButton}
               onPress={handleAuthSubmit}
               disabled={authLoading}
+              activeOpacity={0.85}
             >
               {authLoading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.modalSubmitButtonText}>
-                  {isRegister ? 'Registrarme en Supabase' : 'Ingresar'}
-                </Text>
+                <View style={styles.modalSubmitRow}>
+                  <Text style={styles.modalSubmitButtonText}>
+                    {isRegister ? 'Registrarme en Supabase' : 'Ingresar'}
+                  </Text>
+                  <Ionicons name="arrow-forward" size={16} color="#FFFFFF" style={{ marginLeft: 6 }} />
+                </View>
               )}
             </TouchableOpacity>
 
@@ -366,6 +446,13 @@ export default function PerfilScreen({ navigation }) {
                   : '¿No tienes cuenta? Regístrate gratis aquí'}
               </Text>
             </TouchableOpacity>
+
+            <View style={styles.modalSecurityBadge}>
+              <Ionicons name="shield-checkmark" size={13} color={Colors.accentCyan} style={{ marginRight: 6 }} />
+              <Text style={styles.modalSecurityText}>
+                Supabase Auth · Sesión segura con JWT y PostgreSQL
+              </Text>
+            </View>
           </View>
         </View>
       </Modal>
@@ -619,76 +706,182 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.f1Red,
-    paddingVertical: 11,
-    borderRadius: 8,
+    backgroundColor: Colors.primaryRed,
+    paddingVertical: 12,
+    borderRadius: 10,
+    shadowColor: Colors.primaryRed,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
   },
   btnLoginModalText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(5, 7, 10, 0.82)',
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
   modalContent: {
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
+    backgroundColor: Colors.backgroundCardElevated,
+    borderRadius: 20,
+    padding: 22,
+    borderWidth: 1.5,
     borderColor: Colors.borderHighlight,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  modalAccentBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 4,
+    backgroundColor: Colors.primaryRed,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  modalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  modalCloudBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(225, 6, 0, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
   },
   modalTitle: {
     color: Colors.textPrimary,
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.backgroundDark,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   modalSubtitle: {
     color: Colors.textSecondary,
     fontSize: 12,
-    marginBottom: 16,
-    lineHeight: 17,
+    marginBottom: 14,
+    lineHeight: 18,
   },
-  modalInput: {
+  modalSegmentContainer: {
+    flexDirection: 'row',
     backgroundColor: Colors.backgroundDark,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    color: Colors.textPrimary,
-    fontSize: 14,
+    borderRadius: 10,
+    padding: 3,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginBottom: 12,
+  },
+  modalSegmentTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 7,
+  },
+  modalSegmentTabActive: {
+    backgroundColor: Colors.backgroundCardElevated,
+    borderWidth: 1,
+    borderColor: Colors.borderHighlight,
+  },
+  modalSegmentText: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  modalSegmentTextActive: {
+    color: Colors.textPrimary,
+    fontWeight: '800',
+  },
+  modalInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.backgroundDark,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 10,
+    height: 46,
+  },
+  modalInputIcon: {
+    marginRight: 10,
+  },
+  modalInputField: {
+    flex: 1,
+    color: Colors.textPrimary,
+    fontSize: 13,
+    paddingVertical: 0,
   },
   modalSubmitButton: {
-    backgroundColor: Colors.f1Red,
+    backgroundColor: Colors.primaryRed,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 6,
+    shadowColor: Colors.primaryRed,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  modalSubmitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   modalSubmitButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   modalToggleLink: {
     alignItems: 'center',
-    marginTop: 14,
-    paddingVertical: 4,
+    marginTop: 12,
+    paddingVertical: 6,
   },
   modalToggleLinkText: {
     color: Colors.accentCyan,
     fontSize: 12,
+    fontWeight: '700',
+  },
+  modalSecurityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+  },
+  modalSecurityText: {
+    color: Colors.textMuted,
+    fontSize: 10,
     fontWeight: '600',
   },
 });

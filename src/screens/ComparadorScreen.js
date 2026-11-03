@@ -56,17 +56,22 @@ export default function ComparadorScreen({ navigation, route }) {
     const sum = valA + valB;
     const comparable = numeric && Number.isFinite(valA) && Number.isFinite(valB)
       && valA >= 0 && valB >= 0 && Number.isFinite(sum) && sum > 0;
+    const aWins = comparable && valA > valB;
+    const bWins = comparable && valB > valA;
     return (
       <View style={styles.metricRow} key={label}>
         <View style={styles.metricLabels}>
           <Text style={styles.metricTitle}>{label.toUpperCase()}</Text>
-          <Text style={[styles.valText, styles.valLeft]}>{display(valA)}</Text>
-          <Text style={[styles.valText, styles.valRight]}>{display(valB)}</Text>
+          <Text style={[styles.valText, styles.valLeft, aWins && styles.valWinning]}>{display(valA)}</Text>
+          <Text style={[styles.valText, styles.valRight, bWins && styles.valWinning]}>{display(valB)}</Text>
         </View>
-        {comparable && <View style={styles.barTrack}>
-          <View style={[styles.barLeft, { flex: valA / sum }]} />
-          <View style={[styles.barRight, { flex: valB / sum }]} />
-        </View>}
+        {comparable && (
+          <View style={styles.barTrack}>
+            <View style={[styles.barLeft, { flex: valA / sum }]} />
+            <View style={styles.barDivider} />
+            <View style={[styles.barRight, { flex: valB / sum }]} />
+          </View>
+        )}
       </View>
     );
   };
@@ -193,83 +198,101 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 20,
     marginHorizontal: 16,
     marginTop: 14,
     backgroundColor: Colors.backgroundCard,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.borderHighlight,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   driverCol: {
     alignItems: 'center',
     flex: 1,
   },
   selectButton: {
-    marginTop: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    borderRadius: 6,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 8,
     backgroundColor: Colors.backgroundCardElevated,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   selectButtonText: {
     color: Colors.textPrimary,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   driverOption: {
-    paddingVertical: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: Colors.divider,
+    borderRadius: 8,
   },
   driverOptionDisabled: {
-    opacity: 0.45,
+    opacity: 0.35,
   },
   numberPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 6,
-    marginBottom: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginBottom: 8,
+    minWidth: 38,
+    alignItems: 'center',
   },
   pillNumber: {
     color: '#000000',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
   },
   driverNameBig: {
     color: Colors.textPrimary,
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '900',
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
   teamSub: {
     color: Colors.textSecondary,
     fontSize: 11,
-    marginTop: 2,
+    marginTop: 3,
     textAlign: 'center',
   },
   vsBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: Colors.backgroundDark,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.borderHighlight,
+    borderWidth: 1.5,
+    borderLeftColor: Colors.accentCyan,
+    borderRightColor: Colors.accentOrange,
+    borderTopColor: Colors.borderHighlight,
+    borderBottomColor: Colors.borderHighlight,
+    marginHorizontal: 8,
   },
   vsText: {
-    color: Colors.textMuted,
-    fontSize: 11,
+    color: Colors.textPrimary,
+    fontSize: 12,
     fontWeight: '900',
+    letterSpacing: 1,
   },
   statsCard: {
     backgroundColor: Colors.backgroundCard,
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: 16,
+    padding: 18,
     marginHorizontal: 16,
-    marginTop: 12,
+    marginTop: 14,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -282,7 +305,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   metricRow: {
-    marginBottom: 14,
+    marginBottom: 16,
   },
   metricLabels: {
     flexDirection: 'row',
@@ -297,7 +320,14 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     fontSize: 15,
     lineHeight: 20,
+    fontWeight: '800',
+  },
+  valWinning: {
+    fontSize: 16,
     fontWeight: '900',
+    textShadowColor: 'rgba(255, 255, 255, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   valLeft: {
     color: Colors.accentCyan,
@@ -310,18 +340,25 @@ const styles = StyleSheet.create({
   metricTitle: {
     width: '100%',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
     color: Colors.textSecondary,
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontWeight: '800',
+    letterSpacing: 0.6,
   },
   barTrack: {
-    height: 8,
-    borderRadius: 4,
+    height: 10,
+    borderRadius: 5,
     flexDirection: 'row',
     overflow: 'hidden',
     backgroundColor: Colors.backgroundDark,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  barDivider: {
+    width: 2,
+    height: '100%',
+    backgroundColor: Colors.background,
   },
   barLeft: {
     height: '100%',
