@@ -4,6 +4,7 @@ import { Colors } from '../theme/colors';
 import Header from '../components/Header';
 import LocalStorageManager from '../storage/LocalStorageManager';
 import F1DataService from '../services/F1DataService';
+import AuthService from '../services/AuthService';
 import { resolveDriverFavorites, resolveTeamFavorites } from '../utils/favorites';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -14,6 +15,8 @@ export default function FavoritosScreen({ navigation }) {
   const [catalog, setCatalog] = useState({ drivers: [], teams: [] });
   const [loading, setLoading] = useState(true);
   const [lookupWarning, setLookupWarning] = useState(false);
+  const [authUser, setAuthUser] = useState(null);
+  const [syncing, setSyncing] = useState(false);
   const [alerts, setAlerts] = useState({
     boxes: true, radio: true, safetyCar: true, leaderChange: false,
   });
@@ -23,15 +26,17 @@ export default function FavoritosScreen({ navigation }) {
 
   const loadPreferences = useCallback(async () => {
     const request = ++preferenceRequest.current;
-    const [records, teams] = await Promise.all([
+    const [records, teams, user] = await Promise.all([
       LocalStorageManager.obtenerDetalleFavoritos(),
       // Si no se pueden leer las escuderías no se inventan: se informa el fallo.
       LocalStorageManager.obtenerEscuderiasFavoritas().catch(() => null),
+      AuthService.getCurrentUser().catch(() => null),
     ]);
     if (mounted.current && request === preferenceRequest.current) {
       setFavoriteRecords(records);
       setFavoriteTeams(teams ?? []);
       setTeamsReadError(teams === null);
+      setAuthUser(user);
     }
   }, []);
 
@@ -107,6 +112,24 @@ export default function FavoritosScreen({ navigation }) {
     if (navigation.canGoBack?.()) navigation.goBack();
     else navigation.navigate('MainTabs', { screen: 'Más' });
   };
+
+  const handleManualSync = async () => {
+    setSyncing(true);
+    try {
+      const res = await AuthService.sincronizarFavoritosConSupabase();
+      if (res.ok) {
+        await loadPreferences();
+        Alert.alert('Sincronización exitosa ☁️', `Se sincronizaron tus favoritos con Supabase (${res.count} elementos).`);
+      } else {
+        Alert.alert('Aviso', res.error || 'No se pudo sincronizar.');
+      }
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Error de red.');
+    } finally {
+      if (mounted.current) setSyncing(false);
+    }
+  };
+
   const favoriteDrivers = resolveDriverFavorites(favoriteRecords, catalog.drivers);
   const favoriteTeamItems = resolveTeamFavorites(favoriteTeams, catalog.teams);
 
@@ -125,6 +148,32 @@ export default function FavoritosScreen({ navigation }) {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Banner de Estado Cloud / Local */}
+        <View style={styles.cloudBanner}>
+          <View style={styles.cloudBannerLeft}>
+            <Ionicons
+              name={authUser?.email ? "cloud-done" : "cloud-offline-outline"}
+              size={18}
+              color={authUser?.email ? Colors.accentGreen : Colors.accentYellow}
+              style={{ marginRight: 8 }}
+            />
+            <Text style={styles.cloudBannerText}>
+              {authUser?.email
+                ? `Respaldado en Supabase (${authUser.email})`
+                : 'Modo Local (AsyncStorage)'}
+            </Text>
+          </View>
+          {authUser?.email ? (
+            <TouchableOpacity style={styles.syncSmallBtn} onPress={handleManualSync} disabled={syncing}>
+              <Text style={styles.syncSmallBtnText}>{syncing ? '...' : 'Sincronizar'}</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={() => navigation.navigate('Perfil')}>
+              <Text style={styles.loginLinkText}>Conectar Nube</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {loading && <Text style={styles.favSub}>Cargando favoritos...</Text>}
         {lookupWarning && <Text style={styles.favSub}>No se pudo actualizar la información de clasificación. Tus favoritos guardados se conservan.</Text>}
         {/* SECCIÓN 1: PILOTOS FAVORITOS (Mockup 12) */}
@@ -402,6 +451,49 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 11,
     marginTop: 2,
+  },
+  cloudBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.backgroundCard,
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  cloudBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  cloudBannerText: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  syncSmallBtn: {
+    backgroundColor: Colors.backgroundCardElevated,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Colors.borderHighlight,
+  },
+  syncSmallBtnText: {
+    color: Colors.accentCyan,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  loginLinkText: {
+    color: Colors.accentCyan,
+    fontSize: 12,
+    fontWeight: '700',
+    paddingHorizontal: 4,
   },
 });
 

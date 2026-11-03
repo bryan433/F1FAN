@@ -101,13 +101,70 @@ class AuthService {
 
     // Sincronizar favoritos locales a la cuenta según SD-02
     try {
-      const localFavs = await LocalStorageManager.obtenerFavoritos();
-      console.log('[AuthService] Favoritos sincronizados con la nube:', localFavs);
+      await this.sincronizarFavoritosConSupabase();
     } catch (e) {
       console.warn('[AuthService] Error al sincronizar favoritos locales:', e);
     }
 
     return this.currentUser;
+  }
+
+  /**
+   * Sincroniza bidireccionalmente los favoritos locales (AsyncStorage) con Supabase
+   */
+  async sincronizarFavoritosConSupabase() {
+    try {
+      const user = await this.getCurrentUser();
+      if (!user || user.isGuest || !user.email) {
+        return { ok: false, error: 'Debes iniciar sesión con tu cuenta para sincronizar con la nube.' };
+      }
+
+      // 1. Obtener favoritos locales
+      const [driverFavs, teamFavs] = await Promise.all([
+        LocalStorageManager.obtenerFavoritos().catch(() => []),
+        LocalStorageManager.obtenerEscuderiasFavoritas().catch(() => []),
+      ]);
+
+      // 2. Subir favoritos locales a Supabase
+      const rowsToUpsert = [
+        ...driverFavs.map(id => ({ usuario_id: user.id, item_id: String(id), tipo: 'piloto' })),
+        ...teamFavs.map(id => ({ usuario_id: user.id, item_id: String(id), tipo: 'escuderia' })),
+      ];
+
+      if (rowsToUpsert.length > 0) {
+        const { error: upsertErr } = await supabase
+          .from('favoritos')
+          .upsert(rowsToUpsert, { onConflict: 'usuario_id,item_id,tipo' });
+        if (upsertErr) console.warn('[AuthService] Upsert en Supabase:', upsertErr.message);
+      }
+
+      // 3. Descargar todos los favoritos asociados al usuario desde Supabase
+      const { data: cloudFavs, error: fetchErr } = await supabase
+        .from('favoritos')
+        .select('item_id, tipo')
+        .eq('usuario_id', user.id);
+
+      if (fetchErr) throw fetchErr;
+
+      // 4. Fusionar en almacenamiento local
+      if (Array.isArray(cloudFavs)) {
+        for (const item of cloudFavs) {
+          if (item.tipo === 'piloto') {
+            await LocalStorageManager.guardarFavorito(item.item_id).catch(() => {});
+          } else if (item.tipo === 'escuderia') {
+            const currentTeams = await LocalStorageManager.obtenerEscuderiasFavoritas().catch(() => []);
+            if (!currentTeams.includes(item.item_id)) {
+              await LocalStorageManager.toggleEscuderiaFavorita(item.item_id).catch(() => {});
+            }
+          }
+        }
+      }
+
+      return { ok: true, count: cloudFavs?.length || rowsToUpsert.length };
+    } catch (err) {
+      console.warn('[AuthService] Error en sincronización con Supabase:', err.message);
+      return { ok: false, error: err.message };
+    }
   }
 
   async loginAsGuest() {
