@@ -11,8 +11,8 @@ on:
       - main
 
 jobs:
-  test:
-    name: Test & QA Coverage
+  unit-tests:
+    name: Frontend Unit Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -28,19 +28,64 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Unit Tests & Unit Coverage
+      - name: Run Unit Tests & Coverage
         run: npm run test:unit:coverage
+
+      - name: Upload Unit Coverage Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: coverage-unit/
+          retention-days: 14
+
+  integration-tests:
+    name: Frontend Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Screen Integration Tests
+        run: npm run test:integration
+
+  quality-gate:
+    name: Frontend Quality & Full Suite
+    needs: [unit-tests, integration-tests]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Run Full Test Suite in CI Mode
         run: npm run test:ci
 
-      - name: Upload Test Coverage Artifacts
+      - name: Upload Full Coverage Artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: f1fan-test-coverage
+          name: full-test-coverage
           path: |
             coverage/
             coverage-unit/
           retention-days: 14
-

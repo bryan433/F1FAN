@@ -8,6 +8,7 @@
     "test:coverage": "jest --coverage",
     "test:unit": "jest --config jest.unit.config.js",
     "test:unit:coverage": "jest --config jest.unit.config.js --coverage",
+    "test:integration": "jest --testPathPattern=__tests__/screens",
     "test:ci": "jest --ci --maxWorkers=2 --coverage",
     "start": "expo start",
     "android": "expo start --android",

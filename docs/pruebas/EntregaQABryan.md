@@ -106,24 +106,23 @@ Tras la incorporación de estas suites, las métricas globales y unitarias alcan
 
 ---
 
-## 5. Pipeline de Integración Continua (GitHub Actions)
+## 5. Pipeline Modularizado de CI (GitHub Actions)
 
-Se implementó el archivo `.github/workflows/ci.yml` con el siguiente flujo de trabajo:
+Se implementó el flujo en `.github/workflows/ci.yml` estructurado en **3 etapas (jobs) modulares e independientes**:
 
 ```mermaid
-flowchart LR
-    A[Push / PR a rama] --> B[Checkout actions/checkout@v4]
-    B --> C[Setup Node.js 20 actions/setup-node@v4]
-    C --> D[Instalación limpia npm ci]
-    D --> E[Pruebas Unitarias y Cobertura]
-    E --> F[Suite Completa en Modo CI]
-    F --> G[Upload Artifacts Cobertura 14 días]
+flowchart TD
+    A[Push o Pull Request a main/feature] --> B[Job 1: Frontend Unit Tests]
+    A --> C[Job 2: Frontend Integration Tests]
+    B --> D[Job 3: Frontend Quality & Full Suite]
+    C --> D
+    D --> E[Luz Verde en Pull Request / Push]
 ```
 
-### Características del Workflow:
-1. **Disparadores:** Se ejecuta automáticamente en eventos `push` a ramas `main`, `feature/**`, `fix/**` y en `pull_request` dirigidos a `main`.
-2. **Ambiente estandarizado:** Ejecución sobre contenedor `ubuntu-latest` con Node.js 20 y caché nativo de dependencias de npm.
-3. **Artefactos exportables:** Publica automáticamente los informes generados en `coverage/` y `coverage-unit/` con un periodo de retención de 14 días para auditoría.
+### Características de la Modularización:
+1. **Frontend Unit Tests (Paralelo):** Ejecuta de forma aislada las 26 suites y 256 tests unitarios (`components`, `models`, `storage`, `utils`, `services`) y extrae cobertura unitaria.
+2. **Frontend Integration Tests (Paralelo):** Ejecuta las 9 suites y 124 tests de integración de pantallas completas (`screens`, navegación, sincronización de favoritos).
+3. **Frontend Quality & Full Suite (Quality Gate):** Consolida la ejecución completa en modo CI (`npm run test:ci`, 380 pruebas), verifica umbrales y publica los reportes de cobertura por 14 días.
 
 ---
 
@@ -138,7 +137,11 @@ npm ci
 # 2. Ejecutar la suite unitaria con reporte de cobertura
 npm run test:unit:coverage
 
-# 3. Ejecutar la suite completa simulando el agente de CI
+# 3. Ejecutar la suite de integración de pantallas
+npm run test:integration
+
+# 4. Ejecutar la suite completa simulando el agente de CI
 npm run test:ci
 ```
+
 
