@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, TextInput } from 'react-native';
 import { Colors } from '../theme/colors';
 import Header from '../components/Header';
 import RaceCard from '../components/RaceCard';
@@ -7,9 +7,11 @@ import OfflineBanner from '../components/OfflineBanner';
 import LoadingScreen from '../components/LoadingScreen';
 import F1DataService from '../services/F1DataService';
 import { getChileDateTimeParts, isValidCalendarDate } from '../utils/timezone';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function CalendarioScreen({ navigation }) {
   const [filterTab, setFilterTab] = useState('todo'); // 'todo' | 'proximas' | 'anteriores'
+  const [searchQuery, setSearchQuery] = useState('');
   const [calendar, setCalendar] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,14 +60,39 @@ export default function CalendarioScreen({ navigation }) {
   const todayUTC = new Date(now).toISOString().slice(0, 10);
   const currentYear = getChileDateTimeParts(now)?.fechaChile.slice(0, 4);
   const season = calendar[0]?.season ?? currentYear;
+
   const filteredRaces = calendar.filter((race) => {
-    if (filterTab === 'todo') return true;
-    // Una fecha programada pasada no implica resultados ni un estado finalizado.
-    const instant = race.fechaCarreraUTC ? new Date(race.fechaCarreraUTC).getTime() : NaN;
-    if (Number.isFinite(instant)) return filterTab === 'proximas' ? instant > now : instant <= now;
-    if (!isValidCalendarDate(race.date)) return false;
-    // Sin hora, el día UTC actual sigue siendo ambiguo y se conserva en TODO.
-    return filterTab === 'proximas' ? race.date > todayUTC : race.date < todayUTC;
+    // 1. Filtro por pestañas de tiempo (programadas)
+    if (filterTab !== 'todo') {
+      const instant = race.fechaCarreraUTC ? new Date(race.fechaCarreraUTC).getTime() : NaN;
+      if (Number.isFinite(instant)) {
+        if (filterTab === 'proximas' && instant <= now) return false;
+        if (filterTab === 'anteriores' && instant > now) return false;
+      } else if (!isValidCalendarDate(race.date)) {
+        return false;
+      } else {
+        if (filterTab === 'proximas' && race.date <= todayUTC) return false;
+        if (filterTab === 'anteriores' && race.date >= todayUTC) return false;
+      }
+    }
+
+    // 2. Filtro en tiempo real por búsqueda de texto
+    const query = searchQuery.trim().toLowerCase();
+    if (query) {
+      const name = String(race.name || race.nombreOficial || race.nombreCorto || race.nombreCarrera || '').toLowerCase();
+      const circuitName = String(race.circuit || race.circuito?.nombreCircuito || (typeof race.circuito === 'string' ? race.circuito : '')).toLowerCase();
+      const country = String(race.country || race.pais || race.circuito?.pais || '').toLowerCase();
+      const roundStr = String(race.round || '').toLowerCase();
+      const matches = name.includes(query)
+        || circuitName.includes(query)
+        || country.includes(query)
+        || roundStr === query
+        || `round ${roundStr}`.includes(query)
+        || `ronda ${roundStr}`.includes(query);
+      if (!matches) return false;
+    }
+
+    return true;
   });
 
   return (
@@ -77,6 +104,32 @@ export default function CalendarioScreen({ navigation }) {
       />
 
       <OfflineBanner visible={Boolean(warning)} message={warning || ''} />
+
+      {/* Barra de Búsqueda en Vivo */}
+      <View style={styles.searchBarContainer}>
+        <Ionicons name="search-outline" size={17} color={Colors.textSecondary} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar carrera, circuito o país..."
+          placeholderTextColor={Colors.textMuted}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          accessibilityLabel="Buscar carrera en el calendario"
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Limpiar búsqueda"
+            onPress={() => setSearchQuery('')}
+            style={styles.clearSearchBtn}
+          >
+            <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* Tabs de Filtro según Mockup 14 */}
       <View style={styles.tabsContainer}>
@@ -118,12 +171,26 @@ export default function CalendarioScreen({ navigation }) {
         )}
         {!loading && !error && filteredRaces.length === 0 && (
           <View style={styles.historyCard}>
-            <Text style={styles.historyTitle}>{calendar.length === 0 ? 'No hay Grandes Premios publicados para esta temporada.' : 'No hay Grandes Premios para este filtro.'}</Text>
-            {calendar.length === 0 && (
+            <Text style={styles.historyTitle}>
+              {calendar.length === 0
+                ? 'No hay Grandes Premios publicados para esta temporada.'
+                : searchQuery.trim()
+                  ? `No se encontraron carreras para "${searchQuery.trim()}".`
+                  : 'No hay Grandes Premios para este filtro.'}
+            </Text>
+            {searchQuery.trim() ? (
+              <TouchableOpacity
+                accessibilityRole="button"
+                onPress={() => setSearchQuery('')}
+                style={[styles.tabButton, styles.clearResultButton]}
+              >
+                <Text style={styles.tabTextActive}>Limpiar búsqueda</Text>
+              </TouchableOpacity>
+            ) : calendar.length === 0 ? (
               <TouchableOpacity accessibilityRole="button" onPress={loadCalendar} style={styles.tabButton}>
                 <Text style={styles.tabTextActive}>Volver a consultar</Text>
               </TouchableOpacity>
-            )}
+            ) : null}
           </View>
         )}
         {!loading && !error && filteredRaces.map((race) => (
@@ -154,6 +221,38 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: 10,
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    height: 42,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    color: Colors.textPrimary,
+    fontSize: 13,
+    paddingVertical: 0,
+  },
+  clearSearchBtn: {
+    padding: 4,
+  },
+  clearResultButton: {
+    marginTop: 10,
+    backgroundColor: Colors.backgroundCardElevated,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: Colors.borderHighlight,
   },
   tabsContainer: {
     flexDirection: 'row',

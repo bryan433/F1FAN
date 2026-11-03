@@ -227,3 +227,26 @@ test('una actualización fallida termina la carga y no mantiene un calendario an
   expect(screen.queryByText('GP de prueba')).toBeNull();
   expect(screen.UNSAFE_getByType(ScrollView).props.refreshControl.props.refreshing).toBe(false);
 });
+
+test('permite buscar en tiempo real por nombre, país o circuito y limpiar la búsqueda', async () => {
+  global.fetch.mockResolvedValue(okResponse(raceResponse([
+    calendarRace({ round: '1', raceName: 'Gran Premio de Mónaco', Circuit: { circuitName: 'Monte Carlo', Location: { country: 'Monaco' } } }),
+    calendarRace({ round: '2', raceName: 'Gran Premio de Monza', Circuit: { circuitName: 'Autodromo Nazionale Monza', Location: { country: 'Italy' } } }),
+  ])));
+  openCalendar();
+  await screen.findByText('Gran Premio de Mónaco');
+  expect(screen.getByText('Gran Premio de Monza')).toBeTruthy();
+
+  const searchInput = screen.getByLabelText('Buscar carrera en el calendario');
+  fireEvent.changeText(searchInput, 'Mónaco');
+  expect(screen.getByText('Gran Premio de Mónaco')).toBeTruthy();
+  expect(screen.queryByText('Gran Premio de Monza')).toBeNull();
+
+  fireEvent.changeText(searchInput, 'Inexistente');
+  expect(screen.getByText('No se encontraron carreras para "Inexistente".')).toBeTruthy();
+  expect(screen.queryByText('Gran Premio de Mónaco')).toBeNull();
+
+  fireEvent.press(screen.getByText('Limpiar búsqueda'));
+  expect(screen.getByText('Gran Premio de Mónaco')).toBeTruthy();
+  expect(screen.getByText('Gran Premio de Monza')).toBeTruthy();
+});

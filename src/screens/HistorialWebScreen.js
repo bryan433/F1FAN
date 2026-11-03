@@ -128,8 +128,23 @@ export default function HistorialWebScreen({ navigation }) {
       >
         <View style={styles.modalBackdrop}>
           <View style={styles.seasonModal} accessibilityViewIsModal>
-            <Text style={styles.modalTitle}>Selecciona una temporada</Text>
-            <ScrollView accessibilityLabel="Temporadas disponibles">
+            <View style={styles.modalAccentBar} />
+            <View style={styles.modalHeaderRow}>
+              <View style={styles.modalTitleBlock}>
+                <Ionicons name="time" size={16} color={Colors.accentOrange} style={{ marginRight: 8 }} />
+                <Text style={styles.modalTitle}>Selecciona una temporada</Text>
+              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar selector"
+                onPress={() => setSelectorVisible(false)}
+                style={styles.modalCloseCircle}
+              >
+                <Ionicons name="close" size={18} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView accessibilityLabel="Temporadas disponibles" showsVerticalScrollIndicator={false}>
               {seasons.map(year => (
                 <TouchableOpacity
                   key={year}
@@ -139,11 +154,16 @@ export default function HistorialWebScreen({ navigation }) {
                   style={[styles.seasonOption, year === selectedSeason && styles.yearPillActive]}
                   onPress={() => selectSeason(year)}
                 >
-                  <Text style={styles.yearTextActive}>{year}</Text>
+                  <Text style={[styles.yearText, year === selectedSeason && styles.yearTextActive]}>
+                    Temporada {year}
+                  </Text>
+                  {year === selectedSeason && (
+                    <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
+                  )}
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <TouchableOpacity accessibilityRole="button" style={styles.yearPill} onPress={() => setSelectorVisible(false)}>
+            <TouchableOpacity accessibilityRole="button" style={[styles.yearPill, styles.modalCloseBtn]} onPress={() => setSelectorVisible(false)}>
               <Text style={styles.yearText}>Cerrar</Text>
             </TouchableOpacity>
           </View>
@@ -288,30 +308,74 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(5, 7, 10, 0.82)',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: 20,
   },
   seasonModal: {
     width: '100%',
-    maxWidth: 360,
-    height: '70%',
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: 12,
-    padding: 16,
+    maxWidth: 380,
+    height: '72%',
+    backgroundColor: Colors.backgroundCardElevated,
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1.5,
+    borderColor: Colors.borderHighlight,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  modalAccentBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: Colors.accentOrange,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  modalTitleBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   modalTitle: {
     color: Colors.textPrimary,
     fontSize: 16,
     fontWeight: '800',
-    marginBottom: 12,
+  },
+  modalCloseCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.backgroundDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   seasonOption: {
     height: 44,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: 10,
+    backgroundColor: Colors.backgroundDark,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalCloseBtn: {
+    marginTop: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
   },
   dataNotice: {
     color: Colors.textSecondary,
