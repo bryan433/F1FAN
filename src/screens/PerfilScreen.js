@@ -30,23 +30,25 @@ export default function PerfilScreen({ navigation }) {
     loadSettings();
   }, []);
 
-  const handleToggle = async (key) => {
-    const updated = { ...settings, [key]: !settings[key] };
-    setSettings(updated);
-    await LocalStorageManager.guardarAjustes(updated);
+  // Solo se envía el ajuste modificado: si la carga inicial falló, los valores en pantalla
+  // son los predeterminados y no deben pisar los ajustes reales guardados.
+  const saveSetting = async (key, value) => {
+    const previous = settings[key];
+    setSettings(prev => ({ ...prev, [key]: value }));
+    if (await LocalStorageManager.guardarAjustes({ [key]: value })) return;
+    setSettings(prev => ({ ...prev, [key]: previous }));
+    Alert.alert('No se pudo guardar el ajuste', 'Se mantuvo el valor anterior. Inténtalo de nuevo.');
   };
 
-  const handleToggleUnits = async () => {
-    const newUnit = settings.unidades === 'km/h' ? 'mph' : 'km/h';
-    const updated = { ...settings, unidades: newUnit };
-    setSettings(updated);
-    await LocalStorageManager.guardarAjustes(updated);
-  };
+  const handleToggle = key => saveSetting(key, !settings[key]);
+
+  const handleToggleUnits = () => saveSetting('unidades', settings.unidades === 'km/h' ? 'mph' : 'km/h');
 
   return (
     <View style={styles.container}>
       <View style={styles.navBar}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver"
+          style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.navTitle}>Perfil & Ajustes</Text>
@@ -106,6 +108,8 @@ export default function PerfilScreen({ navigation }) {
               <Text style={styles.settingDesc}>Habilita telemetría detallada y micro-sectores</Text>
             </View>
             <Switch
+              accessibilityRole="switch"
+              accessibilityLabel="Modo Experto"
               value={settings.modoExperto}
               onValueChange={() => handleToggle('modoExperto')}
               trackColor={{ false: Colors.backgroundDark, true: Colors.accentCyan }}
@@ -119,6 +123,8 @@ export default function PerfilScreen({ navigation }) {
               <Text style={styles.settingDesc}>Oculta posiciones y podios hasta abrir la carrera</Text>
             </View>
             <Switch
+              accessibilityRole="switch"
+              accessibilityLabel="Evitar Spoilers"
               value={settings.evitarSpoilers}
               onValueChange={() => handleToggle('evitarSpoilers')}
               trackColor={{ false: Colors.backgroundDark, true: Colors.accentCyan }}
@@ -132,6 +138,8 @@ export default function PerfilScreen({ navigation }) {
               <Text style={styles.settingDesc}>Ajuste automático según HU-02 a Santiago</Text>
             </View>
             <Switch
+              accessibilityRole="switch"
+              accessibilityLabel="Hora Local de Chile (CLT)"
               value={settings.horaChilenaActivada}
               onValueChange={() => handleToggle('horaChilenaActivada')}
               trackColor={{ false: Colors.backgroundDark, true: Colors.accentGreen }}

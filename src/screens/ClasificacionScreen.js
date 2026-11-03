@@ -17,6 +17,7 @@ export default function ClasificacionScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [favoriteRecords, setFavoriteRecords] = useState([]);
   const [favoriteTeams, setFavoriteTeams] = useState([]);
+  const [teamsReadError, setTeamsReadError] = useState(false);
   const inFlight = useRef(null);
   const mounted = useRef(true);
   const preferenceRequest = useRef(0);
@@ -24,9 +25,15 @@ export default function ClasificacionScreen({ navigation, route }) {
   const loadPreferences = useCallback(async () => {
     const request = ++preferenceRequest.current;
     const [records, teams] = await Promise.all([
-      LocalStorageManager.obtenerDetalleFavoritos(), LocalStorageManager.obtenerEscuderiasFavoritas(),
+      LocalStorageManager.obtenerDetalleFavoritos(),
+      // Si no se pueden leer las escuderías no se inventan: se informa el fallo y la tabla sigue visible.
+      LocalStorageManager.obtenerEscuderiasFavoritas().catch(() => null),
     ]);
-    if (mounted.current && request === preferenceRequest.current) { setFavoriteRecords(records); setFavoriteTeams(teams); }
+    if (mounted.current && request === preferenceRequest.current) {
+      setFavoriteRecords(records);
+      setFavoriteTeams(teams ?? []);
+      setTeamsReadError(teams === null);
+    }
   }, []);
 
   const loadStandings = useCallback(() => {
@@ -86,7 +93,14 @@ export default function ClasificacionScreen({ navigation, route }) {
   };
 
   const handleToggleTeamFavorite = async team => {
-    await LocalStorageManager.toggleEscuderiaFavorita(team.idEscuderia);
+    const id = String(team.idEscuderia).trim().toLowerCase();
+    try {
+      // Si la escritura falla se devuelve la lista guardada sin cambios.
+      const lista = await LocalStorageManager.toggleEscuderiaFavorita(team.idEscuderia);
+      if (lista.includes(id) === team.esFavorito) throw new Error('Sin cambios');
+    } catch {
+      Alert.alert('No se pudo guardar la escudería favorita', 'Tu selección guardada no cambió. Inténtalo de nuevo.');
+    }
     await loadPreferences();
   };
 
@@ -132,6 +146,11 @@ export default function ClasificacionScreen({ navigation, route }) {
           {snapshot && <>
             {tableStatus('Pilotos', snapshot.drivers)}
             {tableStatus('Constructores', snapshot.teams)}
+            {teamsReadError && (
+              <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+                <Text accessibilityRole="alert" style={styles.seasonText}>No se pudieron leer tus escuderías favoritas guardadas.</Text>
+              </View>
+            )}
             <StandingsTable drivers={drivers} teams={teams}
               onDriverPress={driver => navigation.navigate('PerfilPiloto', { driverId: driver.idPiloto, driver })}
               onToggleFavorite={handleToggleFavorite} onToggleTeamFavorite={handleToggleTeamFavorite} />

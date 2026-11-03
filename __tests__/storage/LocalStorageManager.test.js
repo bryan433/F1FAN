@@ -296,25 +296,51 @@ describe('LocalStorageManager', () => {
     // PRUEBAS DE ESCUDERÍAS FAVORITAS
     // ==========================================
 
-    test('recupera escuderías predeterminadas si los datos están corruptos', async () => {
+    test('informa el fallo sin inventar escuderías si los datos están corruptos', async () => {
+        const aviso = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
         await AsyncStorage.setItem(
             '@f1fan_favorite_teams',
             'JSON inválido'
         );
 
-        const equipos = await LocalStorageManager.obtenerEscuderiasFavoritas();
+        await expect(
+            LocalStorageManager.obtenerEscuderiasFavoritas()
+        ).rejects.toThrow('No se pudieron leer las escuderías favoritas guardadas.');
 
-        expect(equipos).toEqual(['mercedes', 'mclaren']);
+        expect(aviso).toHaveBeenCalled();
     });
 
     test('maneja errores al modificar escuderías favoritas', async () => {
+        jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+        await AsyncStorage.setItem(
+            '@f1fan_favorite_teams',
+            JSON.stringify(['mclaren'])
+        );
+
+        // Si falla la escritura se devuelve la lista guardada, sin cambios
         jest.spyOn(AsyncStorage, 'setItem')
             .mockRejectedValueOnce(new Error('Error al guardar equipos'));
 
         const resultado =
             await LocalStorageManager.toggleEscuderiaFavorita('ferrari');
 
-        expect(resultado).toEqual([]);
+        expect(resultado).toEqual(['mclaren']);
+
+        // Si falla la lectura se informa el error en lugar de una lista vacía
+        jest.spyOn(AsyncStorage, 'getItem')
+            .mockRejectedValueOnce(new Error('Error al leer equipos'));
+
+        await expect(
+            LocalStorageManager.toggleEscuderiaFavorita('ferrari')
+        ).rejects.toThrow('No se pudieron leer las escuderías favoritas guardadas.');
+
+        // Lo guardado no cambió
+        const guardadas =
+            await LocalStorageManager.obtenerEscuderiasFavoritas();
+
+        expect(guardadas).toEqual(['mclaren']);
     });
 
 

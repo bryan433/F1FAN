@@ -8,21 +8,27 @@ import { DRIVERS } from '../data/teamsAndDrivers';
 
 export default function PerfilPilotoScreen({ route, navigation }) {
   const driverParam = route?.params?.driver;
-  const driverId = route?.params?.driverId ?? driverParam?.idPiloto ?? driverParam?.driverId ?? 63;
+  const driverId = route?.params?.driverId ?? driverParam?.idPiloto ?? driverParam?.driverId;
 
-  const driver = useMemo(() => driverParam || DRIVERS.find(d => String(d.idPiloto) === String(driverId))
-    || { idPiloto: driverId, nombre: 'Piloto', apellido: String(driverId) }, [driverParam, driverId]);
+  // Sin parámetros no se inventa un piloto: driver queda en null y se muestra un estado neutro.
+  const driver = useMemo(() => {
+    if (driverParam) return driverParam;
+    if (driverId == null || !String(driverId).trim()) return null;
+    return DRIVERS.find(d => String(d.idPiloto) === String(driverId))
+      || { idPiloto: driverId, nombre: 'Piloto', apellido: String(driverId) };
+  }, [driverParam, driverId]);
   const [isFavorite, setIsFavorite] = useState(false);
   const [saving, setSaving] = useState(false);
   const busy = useRef(false);
   const preferenceRequest = useRef(0);
   const mounted = useRef(false);
-  const identity = driver.driverId ?? driver.idPiloto;
-  const isChampionship = driver.source === 'jolpica';
+  const identity = driver?.driverId ?? driver?.idPiloto;
+  const isChampionship = driver?.source === 'jolpica';
 
   useEffect(() => {
     mounted.current = true;
     const checkFav = async () => {
+      if (!driver) return;
       const request = ++preferenceRequest.current;
       const records = await LocalStorageManager.obtenerDetalleFavoritos();
       const selected = resolveDriverFavorites(records, [driver]).some(entry => entry.current);
@@ -43,7 +49,7 @@ export default function PerfilPilotoScreen({ route, navigation }) {
    * Flujo CU-06: Gestión de favoritos con AsyncStorage
    */
   const handleToggleFavorite = async () => {
-    if (busy.current) return;
+    if (!driver || busy.current) return;
     busy.current = true;
     setSaving(true);
     try {
@@ -73,28 +79,45 @@ export default function PerfilPilotoScreen({ route, navigation }) {
     { gp: 'Gran Bretaña', pos: 'P1', status: 'Finalizado', points: '+25' },
   ];
 
+  // Barra superior de navegación (compartida con el estado "piloto no disponible")
+  const navBar = (
+    <View style={styles.navBar}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver"
+        style={styles.backButton} onPress={() => navigation.goBack()}>
+        <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+      </TouchableOpacity>
+      <Text style={styles.navTitle}>Perfil del Piloto</Text>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={isFavorite ? 'Quitar piloto de favoritos' : 'Añadir piloto a favoritos'}
+        disabled={saving || !driver}
+        style={[styles.favHeaderBtn, isFavorite && styles.favHeaderBtnActive]}
+        onPress={handleToggleFavorite}
+      >
+        <Ionicons
+          name={isFavorite ? 'star' : 'star-outline'}
+          size={18}
+          color={isFavorite ? '#000000' : Colors.textPrimary}
+        />
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (!driver) {
+    return (
+      <View style={styles.container}>
+        {navBar}
+        <View style={styles.unavailableCard}>
+          <Text style={styles.unavailableTitle}>Piloto no disponible</Text>
+          <Text style={styles.unavailableText}>Selecciona un piloto desde Clasificación o Favoritos.</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* Barra superior de navegación */}
-      <View style={styles.navBar}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>Perfil del Piloto</Text>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={isFavorite ? 'Quitar piloto de favoritos' : 'Añadir piloto a favoritos'}
-          disabled={saving}
-          style={[styles.favHeaderBtn, isFavorite && styles.favHeaderBtnActive]}
-          onPress={handleToggleFavorite}
-        >
-          <Ionicons
-            name={isFavorite ? 'star' : 'star-outline'}
-            size={18}
-            color={isFavorite ? '#000000' : Colors.textPrimary}
-          />
-        </TouchableOpacity>
-      </View>
+      {navBar}
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {!isChampionship && <Text style={[styles.sectionHeader, { margin: 16 }]}>PERFIL DE DEMOSTRACIÓN — ESTADÍSTICAS SIMULADAS</Text>}
@@ -227,6 +250,25 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 30,
+  },
+  unavailableCard: {
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: 14,
+    padding: 20,
+    marginHorizontal: 16,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  unavailableTitle: {
+    color: Colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  unavailableText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
   },
   heroCard: {
     backgroundColor: Colors.backgroundCard,

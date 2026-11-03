@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 export default function DriverCard({ driver, position, onPress, onToggleFavorite }) {
   const isFav = Boolean(driver.esFavorito);
+  const fullName = [driver.nombre, driver.apellido].filter(Boolean).join(' ') || driver.codigo || 'piloto';
 
   return (
     <TouchableOpacity
@@ -44,6 +45,8 @@ export default function DriverCard({ driver, position, onPress, onToggleFavorite
 
       {onToggleFavorite && (
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={`${isFav ? 'Quitar' : 'Marcar'} piloto favorito ${fullName}`}
           style={styles.favoriteButton}
           onPress={() => onToggleFavorite(driver)}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
