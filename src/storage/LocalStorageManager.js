@@ -252,23 +252,42 @@ class LocalStorageManager {
     }
   }
 
+  /**
+   * Agrega o quita una escudería favorita y devuelve la lista resultante.
+   * - Si lo guardado no es legible o tiene forma inválida, el cambio explícito del usuario
+   *   lo reemplaza por una lista válida (se parte de [] más la escudería indicada).
+   * - Si falla la lectura (o la escritura de una lista reparada), la promesa se rechaza.
+   * - Si falla la escritura, devuelve la lista guardada sin cambios.
+   */
   async toggleEscuderiaFavorita(equipoId) {
     return updatePreferences(async () => {
+      const id = teamIds(JSON.stringify([equipoId]))[0];
+      let raw;
       try {
-        const lista = teamIds(await AsyncStorage.getItem(LocalStorageManager.FAVORITE_TEAMS_KEY));
-        equipoId = teamIds(JSON.stringify([equipoId]))[0];
-        let nuevaLista;
-        if (lista.includes(equipoId)) {
-          nuevaLista = lista.filter(id => id !== equipoId);
-        } else {
-          nuevaLista = [...lista, equipoId];
-        }
-        await AsyncStorage.setItem(LocalStorageManager.FAVORITE_TEAMS_KEY, JSON.stringify(nuevaLista));
-        notifyPreferences();
-        return nuevaLista;
-      } catch (e) {
-        return [];
+        raw = await AsyncStorage.getItem(LocalStorageManager.FAVORITE_TEAMS_KEY);
+      } catch (error) {
+        console.warn('[LocalStorageManager] Error al leer escuderías favoritas:', error);
+        throw new Error('No se pudieron leer las escuderías favoritas guardadas.');
       }
+      let lista;
+      let reparada = false;
+      try {
+        lista = teamIds(raw);
+      } catch (error) {
+        console.warn('[LocalStorageManager] Escuderías favoritas guardadas no válidas; se reemplazan:', error);
+        lista = [];
+        reparada = true;
+      }
+      const nuevaLista = lista.includes(id) ? lista.filter(item => item !== id) : [...lista, id];
+      try {
+        await AsyncStorage.setItem(LocalStorageManager.FAVORITE_TEAMS_KEY, JSON.stringify(nuevaLista));
+      } catch (error) {
+        console.warn('[LocalStorageManager] Error al guardar escuderías favoritas:', error);
+        if (reparada) throw new Error('No se pudieron guardar las escuderías favoritas.');
+        return lista;
+      }
+      notifyPreferences();
+      return nuevaLista;
     });
   }
 

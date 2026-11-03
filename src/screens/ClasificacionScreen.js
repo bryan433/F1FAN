@@ -93,7 +93,14 @@ export default function ClasificacionScreen({ navigation, route }) {
   };
 
   const handleToggleTeamFavorite = async team => {
-    await LocalStorageManager.toggleEscuderiaFavorita(team.idEscuderia);
+    const id = String(team.idEscuderia).trim().toLowerCase();
+    try {
+      // Si la escritura falla se devuelve la lista guardada sin cambios.
+      const lista = await LocalStorageManager.toggleEscuderiaFavorita(team.idEscuderia);
+      if (lista.includes(id) === team.esFavorito) throw new Error('Sin cambios');
+    } catch {
+      Alert.alert('No se pudo guardar la escudería favorita', 'Tu selección guardada no cambió. Inténtalo de nuevo.');
+    }
     await loadPreferences();
   };
 

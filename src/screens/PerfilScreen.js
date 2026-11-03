@@ -30,18 +30,19 @@ export default function PerfilScreen({ navigation }) {
     loadSettings();
   }, []);
 
-  const handleToggle = async (key) => {
-    const updated = { ...settings, [key]: !settings[key] };
-    setSettings(updated);
-    await LocalStorageManager.guardarAjustes(updated);
+  // Solo se envía el ajuste modificado: si la carga inicial falló, los valores en pantalla
+  // son los predeterminados y no deben pisar los ajustes reales guardados.
+  const saveSetting = async (key, value) => {
+    const previous = settings[key];
+    setSettings(prev => ({ ...prev, [key]: value }));
+    if (await LocalStorageManager.guardarAjustes({ [key]: value })) return;
+    setSettings(prev => ({ ...prev, [key]: previous }));
+    Alert.alert('No se pudo guardar el ajuste', 'Se mantuvo el valor anterior. Inténtalo de nuevo.');
   };
 
-  const handleToggleUnits = async () => {
-    const newUnit = settings.unidades === 'km/h' ? 'mph' : 'km/h';
-    const updated = { ...settings, unidades: newUnit };
-    setSettings(updated);
-    await LocalStorageManager.guardarAjustes(updated);
-  };
+  const handleToggle = key => saveSetting(key, !settings[key]);
+
+  const handleToggleUnits = () => saveSetting('unidades', settings.unidades === 'km/h' ? 'mph' : 'km/h');
 
   return (
     <View style={styles.container}>

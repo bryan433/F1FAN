@@ -72,10 +72,14 @@ export default function FavoritosScreen({ navigation }) {
     return () => { mounted.current = false; unsubscribe(); unsubscribePreferences(); };
   }, [navigation, loadFavs, loadPreferences]);
 
+  // Solo se envía la alerta modificada: si la carga inicial falló, los valores en pantalla
+  // son los predeterminados y no deben pisar las alertas reales guardadas.
   const toggleAlert = async key => {
-    const updated = { ...alerts, [key]: !alerts[key] };
-    setAlerts(updated);
-    await LocalStorageManager.guardarAlertas(updated);
+    const previous = alerts[key];
+    setAlerts(prev => ({ ...prev, [key]: !previous }));
+    if (await LocalStorageManager.guardarAlertas({ [key]: !previous })) return;
+    if (mounted.current) setAlerts(prev => ({ ...prev, [key]: previous }));
+    Alert.alert('No se pudo guardar la alerta', 'Se mantuvo el valor anterior. Inténtalo de nuevo.');
   };
 
   const removeFavDriver = async driver => {
@@ -89,7 +93,12 @@ export default function FavoritosScreen({ navigation }) {
   };
 
   const removeFavTeam = async id => {
-    await LocalStorageManager.toggleEscuderiaFavorita(id);
+    try {
+      // Si la escritura falla se devuelve la lista guardada, que aún la incluye.
+      if ((await LocalStorageManager.toggleEscuderiaFavorita(id)).includes(id)) throw new Error('Sin cambios');
+    } catch {
+      Alert.alert('No se pudo quitar la escudería', 'Tu lista guardada no cambió. Inténtalo de nuevo.');
+    }
     await loadPreferences();
   };
 

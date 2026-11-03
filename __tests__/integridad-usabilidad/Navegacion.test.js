@@ -243,7 +243,7 @@ describe('Parámetros ausentes o inválidos', () => {
     expect(nav.goBack).toHaveBeenCalledTimes(1);
   });
 
-  // DEFECTO: PerfilPilotoScreen usa driverId 63 por defecto y muestra a George Russell (catálogo de demostración) cuando no recibe piloto; además permite guardarlo como favorito.
+  // Regresión IU-04: PerfilPilotoScreen usaba driverId 63 por defecto, mostraba a George Russell y permitía guardarlo como favorito; ahora muestra "Piloto no disponible" con el favorito deshabilitado.
   test('Perfil del piloto sin parámetros no inventa un piloto ni permite guardarlo como favorito', async () => {
     render(<PerfilPilotoScreen route={{}} navigation={navegacionFalsa()} />);
     await act(async () => {});

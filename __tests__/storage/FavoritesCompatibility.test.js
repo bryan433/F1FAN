@@ -86,8 +86,8 @@ test('cambios simultáneos de escuderías conservan ambas selecciones y las pref
   expect((await LocalStorageManager.obtenerAjustes()).unidades).toBe('mph');
 });
 
-test('no sobrescribe escuderías corruptas al intentar modificarlas', async () => {
+test('un cambio explícito repara escuderías corruptas con una lista válida que solo contiene la elegida', async () => {
   await AsyncStorage.setItem(teamKey, '{roto');
-  expect(await LocalStorageManager.toggleEscuderiaFavorita('ferrari')).toEqual([]);
-  expect(await AsyncStorage.getItem(teamKey)).toBe('{roto');
+  expect(await LocalStorageManager.toggleEscuderiaFavorita('ferrari')).toEqual(['ferrari']);
+  expect(await AsyncStorage.getItem(teamKey)).toBe('["ferrari"]');
 });

@@ -160,7 +160,7 @@ describe('Estructura y anuncios', () => {
     expect(seAnuncia(await conError(crear, mensaje, preparar))).toBe(true);
   });
 
-  // DEFECTO: los errores de Clasificación (ClasificacionScreen.js:106 y :131), Comparador (ComparadorScreen.js:105) y Favoritos (FavoritosScreen.js:116) son Text sin rol alert ni región dinámica.
+  // DEFECTO: los errores de Clasificación (ClasificacionScreen.js:120 y :145), Comparador (ComparadorScreen.js:105) y Favoritos (FavoritosScreen.js:129) son Text sin rol alert ni región dinámica.
   test.each([
     ['Clasificación (tabla)', () => <ClasificacionScreen navigation={navegacionFalsa()} />, 'Pilotos: No se pudo actualizar (Jolpica HTTP 503).'],
     ['Clasificación (temporada inválida)', () => <ClasificacionScreen navigation={navegacionFalsa()} route={{ params: { season: 'abc' } }} />, 'No se pudo consultar la clasificación: Temporada no válida.'],

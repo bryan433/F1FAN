@@ -102,7 +102,7 @@ describe('JSON corrupto en cada clave', () => {
       .toEqual(guardado ? [81] : crudo);
   });
 
-  // DEFECTO: teamIds lanza con JSON corrupto y obtenerEscuderiasFavoritas responde con ['mercedes','mclaren'] como si el usuario las hubiera elegido.
+  // Regresión IU-02: con JSON corrupto o forma inválida, obtenerEscuderiasFavoritas respondía ['mercedes','mclaren'] como si el usuario las hubiera elegido; ahora rechaza.
   test('escuderías con JSON corrupto o con forma inválida no se reemplazan por favoritas inventadas', async () => {
     const inventadas = [];
     for (const crudo of ['{roto', '{"a":1}', '[1]']) {
@@ -155,7 +155,7 @@ describe('Rechazos de getItem y setItem en los métodos públicos', () => {
     expect(await AsyncStorage.getItem(clave)).toBe(previo);
   });
 
-  // DEFECTO: el catch de obtenerEscuderiasFavoritas devuelve ['mercedes','mclaren'] cuando la lectura falla.
+  // Regresión IU-02: el catch de obtenerEscuderiasFavoritas devolvía ['mercedes','mclaren'] cuando la lectura fallaba; ahora rechaza con un mensaje en español.
   test('si falla la lectura, obtenerEscuderiasFavoritas no inventa Mercedes ni McLaren', async () => {
     await AsyncStorage.setItem(CLAVES.escuderias, '["ferrari"]');
     jest.spyOn(AsyncStorage, 'getItem').mockRejectedValueOnce(new Error('Lectura bloqueada'));
@@ -164,7 +164,7 @@ describe('Rechazos de getItem y setItem en los métodos públicos', () => {
     expect(Array.isArray(resultado) ? resultado : ['ferrari']).toEqual(['ferrari']);
   });
 
-  // DEFECTO: toggleEscuderiaFavorita captura el error y devuelve [] aunque lo guardado siga siendo ['ferrari'].
+  // Regresión IU-08: toggleEscuderiaFavorita devolvía [] aunque lo guardado siguiera siendo ['ferrari']; ahora rechaza si falla la lectura y devuelve la lista guardada si falla la escritura.
   test.each(['getItem', 'setItem'])('si falla %s, toggleEscuderiaFavorita no informa una lista vacía distinta de la persistida', async operacion => {
     await AsyncStorage.setItem(CLAVES.escuderias, '["ferrari"]');
     jest.spyOn(AsyncStorage, operacion).mockRejectedValueOnce(new Error('Almacenamiento no disponible'));
@@ -175,7 +175,7 @@ describe('Rechazos de getItem y setItem en los métodos públicos', () => {
     expect(Array.isArray(resultado) ? resultado : persistido).toEqual(persistido);
   });
 
-  // DEFECTO: guardarAjustes/guardarAlertas usan los valores predeterminados cuando la lectura falla y sobrescriben las preferencias reales del usuario.
+  // Regresión IU-03: guardarAjustes/guardarAlertas usaban los valores predeterminados cuando la lectura fallaba y sobrescribían las preferencias reales; ahora no escriben y devuelven null.
   test.each([
     ['guardarAjustes', CLAVES.ajustes, { modoExperto: true, evitarSpoilers: true, unidades: 'mph', horaChilenaActivada: false }, { unidades: 'km/h' }],
     ['guardarAlertas', CLAVES.alertas, { boxes: false, radio: false, safetyCar: false, leaderChange: true }, { radio: true }],

@@ -4,6 +4,7 @@
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "test": "jest",
+    "test:qa": "jest --config jest.qa.config.js",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",

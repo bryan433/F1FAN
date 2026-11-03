@@ -228,7 +228,7 @@ describe('Fallos de almacenamiento en favoritos y preferencias', () => {
     expect(await LocalStorageManager.obtenerFavoritos()).toEqual([]);
   });
 
-  // DEFECTO: handleToggleTeamFavorite ignora el fallo de toggleEscuderiaFavorita; no hay aviso al usuario.
+  // Regresión IU-14: handleToggleTeamFavorite ignoraba el fallo de toggleEscuderiaFavorita sin avisar; ahora muestra un Alert y recarga lo guardado.
   test('Clasificación: si falla guardar una escudería favorita avisa con Alert y no la marca', async () => {
     render(<ClasificacionScreen navigation={navegacionFalsa()} />);
     await screen.findByText('A. PRUEBA');
@@ -240,7 +240,7 @@ describe('Fallos de almacenamiento en favoritos y preferencias', () => {
       .toEqual({ aviso: true, marcada: 0 });
   });
 
-  // DEFECTO: removeFavTeam ignora el fallo de toggleEscuderiaFavorita; la escudería sigue visible sin explicar por qué.
+  // Regresión IU-14: removeFavTeam ignoraba el fallo de toggleEscuderiaFavorita y la escudería seguía visible sin explicación; ahora muestra un Alert.
   test('Favoritos: si falla quitar una escudería avisa con Alert y la conserva', async () => {
     await AsyncStorage.setItem(CLAVES.escuderias, '["equipo_prueba"]');
     render(<FavoritosScreen navigation={navegacionFalsa()} />);
@@ -252,7 +252,7 @@ describe('Fallos de almacenamiento en favoritos y preferencias', () => {
       .toEqual({ aviso: true, conservada: true });
   });
 
-  // DEFECTO: si la lectura de escuderías falla, LocalStorageManager devuelve ['mercedes','mclaren'] y Favoritos las presenta como elecciones del usuario.
+  // Regresión IU-02: si la lectura de escuderías fallaba, LocalStorageManager devolvía ['mercedes','mclaren'] y Favoritos las presentaba como elecciones del usuario; ahora se muestra un aviso.
   test('Favoritos: si falla la lectura de escuderías no presenta Mercedes ni McLaren como favoritas', async () => {
     const lecturaOriginal = AsyncStorage.getItem.getMockImplementation();
     AsyncStorage.getItem.mockImplementation((clave, ...resto) => (clave === CLAVES.escuderias
@@ -266,7 +266,7 @@ describe('Fallos de almacenamiento en favoritos y preferencias', () => {
     }
   });
 
-  // DEFECTO: toggleAlert (Favoritos) y handleToggle (Perfil) cambian el interruptor aunque guardarAlertas/guardarAjustes devuelvan null; aparentan un éxito no persistido.
+  // Regresión IU-14: toggleAlert (Favoritos) y handleToggle (Perfil) dejaban el interruptor cambiado aunque guardarAlertas/guardarAjustes devolvieran null; ahora lo revierten y avisan con Alert.
   test.each([
     ['Favoritos (alerta de boxes)', () => <FavoritosScreen navigation={navegacionFalsa()} />, async () => (await LocalStorageManager.obtenerAlertas()).boxes],
     ['Perfil (Modo Experto)', () => <PerfilScreen navigation={navegacionFalsa()} />, async () => (await LocalStorageManager.obtenerAjustes()).modoExperto],
@@ -286,7 +286,7 @@ describe('Fallos de almacenamiento en favoritos y preferencias', () => {
 });
 
 describe('Contención de errores a nivel de aplicación', () => {
-  // DEFECTO: App.js no define un Error Boundary; un fallo de render en cualquier pantalla desmonta toda la aplicación sin interfaz alternativa.
+  // Regresión IU-01: App.js no tenía un Error Boundary y un fallo de render desmontaba toda la aplicación; ahora ErrorBoundary muestra una interfaz alternativa.
   test('un error de render en una pantalla queda contenido y muestra una interfaz alternativa en español', async () => {
     const errores = jest.spyOn(console, 'error').mockImplementation(() => {});
     render(<App />);

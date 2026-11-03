@@ -14,6 +14,11 @@ export default class ErrorBoundary extends React.Component {
     return { hasError: true };
   }
 
+  // Registro para diagnóstico: el error y la pila de componentes donde ocurrió.
+  componentDidCatch(error, info) {
+    console.warn('[ErrorBoundary] Error de render contenido:', error, info?.componentStack);
+  }
+
   handleRetry = () => {
     this.setState({ hasError: false });
   };
