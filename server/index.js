@@ -38,6 +38,20 @@ function setCached(key, data, ttlMs = CACHE_TTL_MS) {
   cache.set(key, { data, expiresAt: Date.now() + ttlMs });
 }
 
+// 0. Ruta raíz de bienvenida
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    message: 'F1Fan Backend API activo en Render 🏎️',
+    endpoints: {
+      health: '/health',
+      driversStandings: '/api/f1/standings/drivers',
+      constructorsStandings: '/api/f1/standings/constructors',
+      syncFavoritos: '/api/favoritos/sync'
+    }
+  });
+});
+
 // 1. Health Check (Render y monitoreo)
 app.get('/health', (req, res) => {
   res.json({
