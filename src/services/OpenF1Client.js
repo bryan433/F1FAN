@@ -8,9 +8,10 @@
 const CLAVE_COMPARACION = /^([A-Za-z0-9_]+)(>=|<=|>|<)$/;
 
 /**
- * Construye la query string. Los parámetros normales se codifican igual que antes
- * (URLSearchParams); los filtros de comparación se envían con el operador sin codificar
- * (`date>=valor`), que es la sintaxis documentada por OpenF1, y con el valor codificado.
+ * Construye la query string. Los parámetros normales se codifican con URLSearchParams.
+ * En los filtros de comparación se codifican `<` y `>` (`date%3E=valor`): NSURL de iOS 16 o
+ * anterior rechaza esos caracteres sin codificar y React Native recodifica entonces toda la
+ * URL, con lo que `%3A` pasa a `%253A`. OpenF1 responde igual a ambas formas.
  */
 export function buildQueryString(params = {}) {
   const normales = new URLSearchParams();
@@ -18,7 +19,8 @@ export function buildQueryString(params = {}) {
   Object.entries(params).forEach(([clave, valor]) => {
     const coincidencia = CLAVE_COMPARACION.exec(clave);
     if (coincidencia) {
-      comparaciones.push(`${coincidencia[1]}${coincidencia[2]}${encodeURIComponent(String(valor))}`);
+      const operador = coincidencia[2].replace('>', '%3E').replace('<', '%3C');
+      comparaciones.push(`${coincidencia[1]}${operador}${encodeURIComponent(String(valor))}`);
     } else {
       normales.append(clave, valor);
     }

@@ -55,8 +55,21 @@ export default function BuscarCarreraScreen({ navigation }) {
   const [intento, setIntento] = useState(0);
   const [seleccionado, setSeleccionado] = useState(null);
   const [altoTitulo, setAltoTitulo] = useState(ALTO_TITULO_ESTIMADO);
+  const [enfocada, setEnfocada] = useState(() => navigation.isFocused?.() ?? true);
   const reducir = useReduceMotion();
   const desplazamientoY = useRef(new Animated.Value(0)).current;
+
+  // La pila mantiene esta pantalla montada bajo la de realidad aumentada con el detalle abierto:
+  // sin el foco, la hoja no debe consumir el botón Atrás de Android destinado a esa pantalla.
+  useEffect(() => {
+    if (typeof navigation.addListener !== 'function') return undefined;
+    const quitarFoco = navigation.addListener('focus', () => setEnfocada(true));
+    const quitarDesenfoque = navigation.addListener('blur', () => setEnfocada(false));
+    return () => {
+      quitarFoco?.();
+      quitarDesenfoque?.();
+    };
+  }, [navigation]);
 
   useEffect(() => {
     let activo = true;
@@ -214,6 +227,7 @@ export default function BuscarCarreraScreen({ navigation }) {
         title={seleccionado?.meeting_name}
         closeLabel="Cerrar detalle"
         testID="detalle-carrera"
+        capturarAtras={enfocada}
       >
         {seleccionado && <DetalleCarrera meeting={seleccionado} onVerAR={verEnRealidadAumentada} />}
       </BottomSheet>

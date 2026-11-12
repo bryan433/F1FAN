@@ -31,8 +31,12 @@ const altoVentana = () => Dimensions.get('window').height;
  * Se abre con `visible`; se cierra con su botón, el fondo, el arrastre o el botón Atrás de
  * Android, y avisa con `onDismiss` cuando terminó de salir. Quien la usa debe ocultar su
  * contenido de fondo a los lectores de pantalla mientras `visible` sea true.
+ *
+ * `capturarAtras` (true por defecto) decide si la hoja abierta intercepta el botón Atrás.
+ * Debe ser false mientras su pantalla no tenga el foco (p. ej. otra pantalla de la pila
+ * encima), para que la pulsación llegue a la pantalla visible.
  */
-export default function BottomSheet({ visible, onDismiss, title, children, closeLabel = 'Cerrar detalle', testID = 'hoja-inferior' }) {
+export default function BottomSheet({ visible, onDismiss, title, children, closeLabel = 'Cerrar detalle', testID = 'hoja-inferior', capturarAtras = true }) {
   const reducir = useReduceMotion();
   const [montada, setMontada] = useState(false);
   const [alto, setAlto] = useState(0);
@@ -176,13 +180,13 @@ export default function BottomSheet({ visible, onDismiss, title, children, close
 
   // Android: el botón Atrás cierra la hoja en lugar de salir de la pantalla.
   useEffect(() => {
-    if (!visible || !montada) return undefined;
+    if (!visible || !montada || !capturarAtras) return undefined;
     const suscripcion = BackHandler.addEventListener('hardwareBackPress', () => {
       acciones.current.cerrar();
       return true;
     });
     return () => suscripcion?.remove?.();
-  }, [visible, montada]);
+  }, [visible, montada, capturarAtras]);
 
   if (!montada) return null;
 

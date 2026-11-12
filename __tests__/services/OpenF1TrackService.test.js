@@ -86,9 +86,13 @@ describe('samplePoints y closeLoopIfNear', () => {
 });
 
 describe('OpenF1Client: filtros de comparación y vueltas', () => {
-  test('buildQueryString envía el operador sin codificar y el valor codificado; el resto igual que URLSearchParams', () => {
+  test('buildQueryString codifica < y > del operador (no el =) y el valor; el resto igual que URLSearchParams', () => {
     expect(buildQueryString({ session_key: 9472, driver_number: 1, 'date>=': '2024-03-02T15:05:20.099Z', 'date<': '2024-03-02T15:06:56.395Z' }))
-      .toBe('session_key=9472&driver_number=1&date>=2024-03-02T15%3A05%3A20.099Z&date<2024-03-02T15%3A06%3A56.395Z');
+      .toBe('session_key=9472&driver_number=1&date%3E=2024-03-02T15%3A05%3A20.099Z&date%3C2024-03-02T15%3A06%3A56.395Z');
+    const todos = buildQueryString({ 'date>=': 'a', 'date<=': 'b', 'date>': 'c', 'date<': 'd' });
+    expect(todos).toBe('date%3E=a&date%3C=b&date%3Ec&date%3Cd');
+    // Sin < ni > crudos: NSURL de iOS 16 o anterior los rechaza y la URL terminaría doblemente codificada.
+    expect(todos).not.toMatch(/[<>]/);
     expect(buildQueryString({ q: 'São Paulo', year: 2024 })).toBe(new URLSearchParams({ q: 'São Paulo', year: 2024 }).toString());
     expect(buildQueryString({})).toBe('');
   });
@@ -108,7 +112,7 @@ describe('OpenF1Client: filtros de comparación y vueltas', () => {
 
 describe('getTrackOutline', () => {
   const vueltaInicio = '2024-03-02T15:05:20.099000+00:00';
-  const ventana = '&date>=2024-03-02T15%3A05%3A20.099Z&date<=2024-03-02T15%3A06%3A56.395Z';
+  const ventana = '&date%3E=2024-03-02T15%3A05%3A20.099Z&date%3C=2024-03-02T15%3A06%3A56.395Z';
 
   function servidorFeliz(extra = {}) {
     return openF1Server({
@@ -218,7 +222,7 @@ describe('getTrackOutline', () => {
     });
     const resultado = await getTrackOutline(meetingOpenF1());
     expect(resultado).toEqual(expect.objectContaining({ sessionKey: 9468, sessionName: 'Qualifying', driverNumber: 81 }));
-    expect(rutasDe(global.fetch)[3]).toMatch(/^\/location\?session_key=9468&driver_number=81&date>=/);
+    expect(rutasDe(global.fetch)[3]).toMatch(/^\/location\?session_key=9468&driver_number=81&date%3E=/);
   });
 
   test('un Gran Premio futuro informa que aún no se disputa sin consultar vueltas', async () => {

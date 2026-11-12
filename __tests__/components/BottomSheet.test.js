@@ -16,10 +16,10 @@ const ALTO = 400;
 const CERRADA = ALTO + 32; // posición cerrada: alto de la hoja más el margen de su sombra
 
 /** Pantalla mínima: abre la hoja y la desmonta cuando avisa que terminó de cerrarse. */
-function Pantalla({ onDismiss = () => {} }) {
+function Pantalla({ onDismiss = () => {}, capturarAtras }) {
   const [visible, setVisible] = useState(true);
   return (
-    <BottomSheet visible={visible} title="Detalle" testID="hoja" onDismiss={() => { setVisible(false); onDismiss(); }}>
+    <BottomSheet visible={visible} title="Detalle" testID="hoja" capturarAtras={capturarAtras} onDismiss={() => { setVisible(false); onDismiss(); }}>
       <Text>Contenido</Text>
     </BottomSheet>
   );
@@ -135,6 +135,28 @@ test.each([
   expect(onDismiss).toHaveBeenCalledTimes(1);
   expect(screen.queryByTestId('hoja-hoja')).toBeNull();
   expect(Animated.spring).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ toValue: CERRADA }));
+});
+
+test('con capturarAtras en false no consume el botón Atrás y al volver a true lo recupera', () => {
+  BackHandler.exitApp.mockClear();
+  const onDismiss = jest.fn();
+  const { rerender } = render(<Pantalla onDismiss={onDismiss} capturarAtras={false} />);
+  medir();
+  avanzar(1500);
+
+  // Sin captura la pulsación sigue de largo (llega al sistema) y la hoja queda abierta.
+  act(() => { BackHandler.mockPressBack(); });
+  expect(BackHandler.exitApp).toHaveBeenCalledTimes(1);
+  avanzar(1500);
+  expect(onDismiss).not.toHaveBeenCalled();
+  expect(desplazamiento()).toBe(0);
+
+  rerender(<Pantalla onDismiss={onDismiss} capturarAtras />);
+  act(() => { BackHandler.mockPressBack(); });
+  expect(BackHandler.exitApp).toHaveBeenCalledTimes(1);
+  avanzar(1500);
+  expect(onDismiss).toHaveBeenCalledTimes(1);
+  expect(screen.queryByTestId('hoja-hoja')).toBeNull();
 });
 
 test('se arrastra 1:1 desde donde se toma y por encima de la posición abierta resiste cada vez más', () => {

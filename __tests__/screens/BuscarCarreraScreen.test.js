@@ -1,5 +1,5 @@
 import React from 'react';
-import { AccessibilityInfo, Alert, Animated, StyleSheet } from 'react-native';
+import { AccessibilityInfo, Alert, Animated, BackHandler, StyleSheet } from 'react-native';
 import { render, screen, fireEvent, act, waitFor, isHiddenFromAccessibility } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BuscarCarreraScreen from '../../src/screens/BuscarCarreraScreen';
@@ -23,6 +23,8 @@ jest.mock('@expo/vector-icons', () => {
   const { View } = require('react-native');
   return { Ionicons: ({ name, size = 12, style }) => <View testID={`icon-${name}`} style={[{ width: size, height: size }, style]} /> };
 });
+// BackHandler de Android con `mockPressBack` para simular el botón Atrás.
+jest.mock('react-native/Libraries/Utilities/BackHandler', () => require('react-native/Libraries/Utilities/__mocks__/BackHandler'));
 
 const AHORA = Date.parse('2026-11-12T12:00:00Z');
 const fetchOriginal = global.fetch;
@@ -199,6 +201,27 @@ test('la hoja es modal: oculta el listado a los lectores de pantalla y ofrece do
   expect(screen.getByRole('button', { name: 'Volver' })).toBeTruthy();
 });
 
+test('con otra pantalla encima la hoja no consume el botón Atrás y, al recuperar el foco, vuelve a cerrarla', async () => {
+  BackHandler.exitApp.mockClear();
+  const navigation = abrir();
+  await screen.findByText('São Paulo Grand Prix');
+  fireEvent.press(fila('São Paulo Grand Prix'));
+  fireEvent.press(screen.getByRole('button', { name: 'Ver en realidad aumentada' }));
+
+  // La pila deja esta pantalla montada debajo: Atrás debe llegar a la pantalla de encima.
+  act(() => { navigation.emitir('blur'); });
+  act(() => { BackHandler.mockPressBack(); });
+  expect(BackHandler.exitApp).toHaveBeenCalledTimes(1);
+  expect(botonAR()).toBeTruthy();
+
+  // De vuelta, el detalle sigue abierto y Atrás lo cierra sin salir de la búsqueda.
+  act(() => { navigation.emitir('focus'); });
+  act(() => { BackHandler.mockPressBack(); });
+  expect(BackHandler.exitApp).toHaveBeenCalledTimes(1);
+  expect(botonAR()).toBeNull();
+  expect(screen.getByRole('button', { name: 'Volver' })).toBeTruthy();
+});
+
 test('el detalle advierte cuando un Gran Premio aún no se disputa o fue cancelado', async () => {
   abrir();
   await screen.findByText('Las Vegas Grand Prix');
@@ -298,7 +321,7 @@ describe('Accesibilidad', () => {
 });
 
 describe('Flujo completo con AppNavigator', () => {
-  const VENTANA = 'date>=2024-03-02T15%3A05%3A20.099Z&date<=2024-03-02T15%3A06%3A56.395Z';
+  const VENTANA = 'date%3E=2024-03-02T15%3A05%3A20.099Z&date%3C=2024-03-02T15%3A06%3A56.395Z';
 
   beforeEach(async () => {
     await AsyncStorage.clear();
