@@ -50,7 +50,7 @@ test('carga el calendario actual con el servicio real, una sola consulta y horar
   expect(screen.getByText('2026-11-08')).toBeTruthy();
   expect(screen.getByText('14:00 (Santiago)')).toBeTruthy();
   expect(getCalendar).toHaveBeenCalledTimes(1);
-  expect(getCalendar).toHaveBeenCalledWith();
+  expect(getCalendar).toHaveBeenCalledWith('2026');
   expect(global.fetch).toHaveBeenCalledTimes(1);
   expect(global.fetch.mock.calls[0][0]).toBe('https://api.jolpi.ca/ergast/f1/2026.json');
   expect(screen.queryByText(/2024|Singapur|09:00 CLT|Ganador:/i)).toBeNull();
