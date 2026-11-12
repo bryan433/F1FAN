@@ -7,11 +7,12 @@ import { Colors } from '../theme/colors';
 export default function SeasonSelector({
   selectedSeason, seasons = [], visible, loading = false, error = null, warning = null,
   onOpen, onClose, onSelect, onRetry,
+  accessibilityLabel = 'Seleccionar temporada del calendario', triggerStyle,
 }) {
   return (
     <>
-      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Seleccionar temporada del calendario"
-        accessibilityState={{ expanded: visible }} onPress={onOpen} style={styles.trigger}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ expanded: visible }} onPress={onOpen} style={[styles.trigger, triggerStyle]}>
         <Ionicons name="calendar-outline" size={18} color={Colors.accentOrange} />
         <Text style={styles.triggerText}>{selectedSeason ? `Temporada ${selectedSeason}` : 'Seleccionar temporada'}</Text>
         <Ionicons name="chevron-down" size={18} color={Colors.textSecondary} />

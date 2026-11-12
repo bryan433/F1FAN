@@ -74,3 +74,11 @@ test('una lista vacía informa ausencia sin fabricar el año seleccionado como d
   expect(screen.getByText('No hay temporadas disponibles.')).toBeTruthy();
   expect(within(screen.getByLabelText('Temporadas disponibles')).queryByRole('button', { name: 'Temporada 2026' })).toBeNull();
 });
+
+test('permite reutilizar el control con una etiqueta accesible propia de Clasificación', () => {
+  const { props } = openSelector({ accessibilityLabel: 'Seleccionar temporada de clasificación' });
+  fireEvent.press(screen.getByRole('button', { name: 'Seleccionar temporada de clasificación' }));
+  expect(props.onOpen).toHaveBeenCalledTimes(1);
+  expect(screen.getByText('Temporada 2026')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Seleccionar temporada del calendario' })).toBeNull();
+});

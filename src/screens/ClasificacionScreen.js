@@ -4,13 +4,24 @@ import { Colors } from '../theme/colors';
 import Header from '../components/Header';
 import StandingsTable from '../components/StandingsTable';
 import LoadingScreen from '../components/LoadingScreen';
+import SeasonSelector from '../components/SeasonSelector';
+import { getSeasons } from '../services/JolpicaService';
+import { getChileDateTimeParts } from '../utils/timezone';
 import F1DataService from '../services/F1DataService';
 import LocalStorageManager from '../storage/LocalStorageManager';
 import { Ionicons } from '@expo/vector-icons';
 import { resolveDriverFavorites } from '../utils/favorites';
 
 export default function ClasificacionScreen({ navigation, route }) {
-  const season = route?.params?.season;
+  const routeYear = String(route?.params?.season ?? '').trim();
+  const routeSeason = /^\d{4}$/.test(routeYear) && Number(routeYear) >= 1950 ? routeYear : null;
+  const [season, setSeason] = useState(() => routeSeason ?? getChileDateTimeParts(Date.now())?.fechaChile.slice(0, 4));
+  const [seasons, setSeasons] = useState(null);
+  const [selectorVisible, setSelectorVisible] = useState(false);
+  const [loadingSeasons, setLoadingSeasons] = useState(false);
+  const [seasonsError, setSeasonsError] = useState(null);
+  const [seasonsWarning, setSeasonsWarning] = useState(null);
+  const seasonsInFlight = useRef(false);
   const [snapshot, setSnapshot] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -42,6 +53,7 @@ export default function ClasificacionScreen({ navigation, route }) {
     if (inFlight.current && inFlight.current.season === season) return inFlight.current.promise;
     const promise = F1DataService.getChampionshipStandings(season)
       .then(async result => {
+        if (!mounted.current || inFlight.current?.promise !== promise) return;
         await loadPreferences();
         if (mounted.current && inFlight.current?.promise === promise) {
           setSnapshot(result);
@@ -55,7 +67,10 @@ export default function ClasificacionScreen({ navigation, route }) {
       }).finally(() => {
         if (inFlight.current?.promise === promise) {
           inFlight.current = null;
-          if (mounted.current) setLoading(false);
+          if (mounted.current) {
+            setLoading(false);
+            setRefreshing(false);
+          }
         }
       });
     inFlight.current = { season, promise };
@@ -64,17 +79,74 @@ export default function ClasificacionScreen({ navigation, route }) {
 
   useEffect(() => {
     mounted.current = true;
+    const unsubscribe = LocalStorageManager.suscribirFavoritos(loadPreferences);
+    return () => {
+      mounted.current = false;
+      inFlight.current = null;
+      preferenceRequest.current += 1;
+      unsubscribe();
+    };
+  }, [loadPreferences]);
+
+  // Solo un cambio explícito de navegación reemplaza la selección del usuario.
+  useEffect(() => {
+    if (!routeSeason) return;
+    inFlight.current = null;
+    setSnapshot(null);
+    setError(null);
     setLoading(true);
+    setSeason(routeSeason);
+  }, [routeSeason]);
+
+  useEffect(() => {
+    setLoading(true);
+    setSnapshot(null);
+    setError(null);
+    setRefreshing(false);
     loadStandings();
     const unsubscribe = navigation.addListener('focus', loadStandings);
-    const unsubscribePreferences = LocalStorageManager.suscribirFavoritos(loadPreferences);
-    return () => { mounted.current = false; unsubscribe(); unsubscribePreferences(); };
-  }, [navigation, loadStandings, loadPreferences]);
+    return () => { inFlight.current = null; unsubscribe(); };
+  }, [navigation, loadStandings]);
 
-  const onRefresh = async () => {
+  const loadSeasons = async () => {
+    if (seasonsInFlight.current) return;
+    seasonsInFlight.current = true;
+    setLoadingSeasons(true);
+    setSeasonsError(null);
+    setSeasonsWarning(null);
+    try {
+      const result = await getSeasons();
+      if (!mounted.current) return;
+      setSeasons(result.data);
+      setSeasonsWarning(result.warning);
+    } catch {
+      if (mounted.current) setSeasonsError('No se pudieron cargar las temporadas de Jolpica.');
+    } finally {
+      seasonsInFlight.current = false;
+      if (mounted.current) setLoadingSeasons(false);
+    }
+  };
+
+  const openSeasonSelector = () => {
+    setSelectorVisible(true);
+    if (seasons === null) loadSeasons();
+  };
+
+  const selectSeason = year => {
+    setSelectorVisible(false);
+    if (year === season) return;
+    // Invalida la consulta anterior antes del efecto del nuevo año.
+    inFlight.current = null;
+    setSnapshot(null);
+    setError(null);
+    setLoading(true);
+    setRefreshing(false);
+    setSeason(year);
+  };
+
+  const onRefresh = () => {
     setRefreshing(true);
-    await loadStandings();
-    if (mounted.current) setRefreshing(false);
+    return loadStandings();
   };
 
   const handleToggleFavorite = async driver => {
@@ -144,15 +216,18 @@ export default function ClasificacionScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      <Header subtitle={`CAMPEONATO MUNDIAL ${snapshot?.season ?? season ?? 'ACTUAL'}`}
+      <Header subtitle={`CAMPEONATO MUNDIAL ${season ?? 'ACTUAL'}`}
         title="Clasificación" onProfilePress={() => navigation.navigate('Perfil')} />
       <View style={styles.subHeader}>
-        <View style={styles.seasonBadge}>
-          <Ionicons name="trophy-outline" size={14} color={Colors.accentYellow} style={{ marginRight: 6 }} />
-          <Text style={styles.seasonText}>Temporada {snapshot?.season ?? season ?? 'actual'}</Text>
+        <View style={styles.seasonControl}>
+          <SeasonSelector selectedSeason={season} seasons={seasons ?? []}
+            accessibilityLabel="Seleccionar temporada de clasificación" triggerStyle={styles.seasonTrigger}
+            visible={selectorVisible} loading={loadingSeasons} error={seasonsError} warning={seasonsWarning}
+            onOpen={openSeasonSelector} onClose={() => setSelectorVisible(false)}
+            onSelect={selectSeason} onRetry={loadSeasons} />
         </View>
         <TouchableOpacity style={styles.compareBtn}
-          onPress={() => navigation.navigate('Comparador', { season: snapshot?.season ?? season })}
+          onPress={() => navigation.navigate('Comparador', { season })}
           activeOpacity={0.8}>
           <Ionicons name="git-compare-outline" size={14} color={Colors.textPrimary} style={{ marginRight: 4 }} />
           <Text style={styles.compareBtnText}>Comparar</Text>
@@ -184,8 +259,8 @@ export default function ClasificacionScreen({ navigation, route }) {
         )}
       </View>
 
-      {loading ? <LoadingScreen message="Consultando posiciones..." /> : (
-        <ScrollView style={styles.scrollArea}
+      {loading && <LoadingScreen message="Consultando posiciones..." />}
+        <ScrollView style={[styles.scrollArea, loading && styles.hidden]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primaryRed} />}>
           {error && <Text style={styles.seasonText}>No se pudo consultar la clasificación: {error}</Text>}
           {snapshot && <>
@@ -196,15 +271,17 @@ export default function ClasificacionScreen({ navigation, route }) {
                 <Text accessibilityRole="alert" style={styles.seasonText}>No se pudieron leer tus escuderías favoritas guardadas.</Text>
               </View>
             )}
+          </>}
+          {/* Permanece montada para conservar la pestaña al cambiar de temporada. */}
+          <View style={!snapshot && styles.hidden}>
             <StandingsTable drivers={filteredDrivers} teams={filteredTeams}
               onDriverPress={driver => navigation.navigate('PerfilPiloto', { driverId: driver.idPiloto, driver })}
               onToggleFavorite={handleToggleFavorite} onToggleTeamFavorite={handleToggleTeamFavorite} />
-          </>}
+          </View>
           <TouchableOpacity style={styles.compareBtn} onPress={onRefresh}>
             <Text style={styles.compareBtnText}>Reintentar / Actualizar</Text>
           </TouchableOpacity>
         </ScrollView>
-      )}
     </View>
   );
 }
@@ -220,7 +297,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 6,
+    paddingBottom: 10,
   },
   searchBarContainer: {
     flexDirection: 'row',
@@ -240,14 +317,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     paddingVertical: 0,
   },
-  seasonBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.backgroundCardElevated,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
+  seasonControl: { flex: 1, marginRight: 12 },
+  seasonTrigger: { marginHorizontal: 0, marginTop: 0 },
+  hidden: { display: 'none' },
   seasonText: {
     color: Colors.textSecondary,
     fontSize: 12,
@@ -272,4 +344,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-
