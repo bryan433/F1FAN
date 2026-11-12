@@ -5,6 +5,8 @@ import Header from '../components/Header';
 import RaceCard from '../components/RaceCard';
 import OfflineBanner from '../components/OfflineBanner';
 import LoadingScreen from '../components/LoadingScreen';
+import SeasonSelector from '../components/SeasonSelector';
+import { getSeasons } from '../services/JolpicaService';
 import F1DataService from '../services/F1DataService';
 import { getChileDateTimeParts, isValidCalendarDate } from '../utils/timezone';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +14,13 @@ import { Ionicons } from '@expo/vector-icons';
 export default function CalendarioScreen({ navigation }) {
   const [filterTab, setFilterTab] = useState('todo'); // 'todo' | 'proximas' | 'anteriores'
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSeason, setSelectedSeason] = useState(() => getChileDateTimeParts(Date.now())?.fechaChile.slice(0, 4) ?? null);
+  const [seasons, setSeasons] = useState(null);
+  const [selectorVisible, setSelectorVisible] = useState(false);
+  const [loadingSeasons, setLoadingSeasons] = useState(false);
+  const [seasonsError, setSeasonsError] = useState(null);
+  const [seasonsWarning, setSeasonsWarning] = useState(null);
+  const seasonsInFlight = useRef(false);
   const [calendar, setCalendar] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -27,8 +36,8 @@ export default function CalendarioScreen({ navigation }) {
     setWarning(null);
     setCalendar([]);
     try {
-      // El servicio elige el año de Santiago y reutiliza la caché de Jolpica.
-      const data = await F1DataService.getCalendar();
+      // El año se elige en pantalla; el servicio mantiene transformación y caché.
+      const data = await F1DataService.getCalendar(selectedSeason);
       if (!Array.isArray(data)) throw new Error('Calendario no válido.');
       if (!mounted.current || currentRequest !== request.current) return;
       setCalendar(data);
@@ -37,9 +46,12 @@ export default function CalendarioScreen({ navigation }) {
       if (!mounted.current || currentRequest !== request.current) return;
       setError('No se pudo cargar el calendario.');
     } finally {
-      if (mounted.current && currentRequest === request.current) setLoading(false);
+      if (mounted.current && currentRequest === request.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, []);
+  }, [selectedSeason]);
 
   useEffect(() => {
     mounted.current = true;
@@ -50,16 +62,52 @@ export default function CalendarioScreen({ navigation }) {
     };
   }, [loadCalendar]);
 
+  const loadSeasons = async () => {
+    if (seasonsInFlight.current) return;
+    seasonsInFlight.current = true;
+    setLoadingSeasons(true);
+    setSeasonsError(null);
+    setSeasonsWarning(null);
+    try {
+      const result = await getSeasons();
+      if (!mounted.current) return;
+      setSeasons(result.data);
+      setSeasonsWarning(result.warning);
+    } catch {
+      if (mounted.current) setSeasonsError('No se pudieron cargar las temporadas de Jolpica.');
+    } finally {
+      seasonsInFlight.current = false;
+      if (mounted.current) setLoadingSeasons(false);
+    }
+  };
+
+  const openSeasonSelector = () => {
+    setSelectorVisible(true);
+    // La lista se consulta al abrir, sin descargar calendarios de otros años.
+    if (seasons === null) loadSeasons();
+  };
+
+  const selectSeason = year => {
+    setSelectorVisible(false);
+    if (year === selectedSeason) return;
+    // Invalida de inmediato la consulta anterior, incluso antes del próximo efecto.
+    request.current += 1;
+    setCalendar([]);
+    setLoading(true);
+    setRefreshing(false);
+    setError(null);
+    setWarning(null);
+    setSelectedSeason(year);
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadCalendar();
-    if (mounted.current) setRefreshing(false);
   };
 
   const now = Date.now();
   const todayUTC = new Date(now).toISOString().slice(0, 10);
-  const currentYear = getChileDateTimeParts(now)?.fechaChile.slice(0, 4);
-  const season = calendar[0]?.season ?? currentYear;
+  const season = selectedSeason;
 
   const filteredRaces = calendar.filter((race) => {
     // 1. Filtro por pestañas de tiempo (programadas)
@@ -104,6 +152,10 @@ export default function CalendarioScreen({ navigation }) {
       />
 
       <OfflineBanner visible={Boolean(warning)} message={warning || ''} />
+      <SeasonSelector selectedSeason={selectedSeason} seasons={seasons ?? []}
+        visible={selectorVisible} loading={loadingSeasons} error={seasonsError} warning={seasonsWarning}
+        onOpen={openSeasonSelector} onClose={() => setSelectorVisible(false)}
+        onSelect={selectSeason} onRetry={loadSeasons} />
 
       {/* Barra de Búsqueda en Vivo */}
       <View style={styles.searchBarContainer}>
