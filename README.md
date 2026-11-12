@@ -154,10 +154,18 @@ npx expo start --ios
 ## Pruebas y evidencias
 
 ```bash
-npm test -- --runInBand
-npm test -- --config jest.unit.config.js --coverage --runInBand
+# Ejecutar todas las pruebas
+npm test
+
+# Ejecutar pruebas unitarias con cobertura
+npm run test:unit:coverage
+
+# Ejecutar suite completa en modo CI (como en GitHub Actions)
+npm run test:ci
 ```
 
-La suite original incluye 330 pruebas en 29 suites; las regresiones de integración se añaden sin eliminar esos archivos. La cobertura unitaria mide componentes, modelos, servicios, almacenamiento y utilidades; no representa cobertura de toda la aplicación. No hay `coverageThreshold` ni CI/CD configurados.
+La suite del proyecto cuenta con **380 pruebas aprobadas en 35 suites (100% éxito)**. La cobertura unitaria alcanza un **89.81% en instrucciones, 89.57% en ramas, 90.35% en funciones y 90.47% en líneas**, superando el mínimo del 80% exigido.
 
-El [informe de resultados](docs/pruebas/InformeResultados.md) distingue el respaldo original de la validación del clon. Las evidencias portátiles están en `docs/pruebas/evidencias/`. La cobertura HTML/LCOV se regenera en `coverage-unit/`, excluido de Git; puede entregarse como artefacto adicional. `docs/Counter.test.tsx` es una referencia académica excluida de Jest.
+El pipeline de **Integración Continua (CI)** está implementado con **GitHub Actions** en [`.github/workflows/ci.yml`](.github/workflows/ci.yml), ejecutando pruebas automáticas y subiendo reportes de cobertura ante cada `push` y `pull_request`.
+
+El [informe de resultados](docs/pruebas/InformeResultados.md) y la [entrega de QA y CI](docs/pruebas/EntregaQABryan.md) detallan las métricas alcanzadas y la trazabilidad de los casos. Las evidencias portátiles están en `docs/pruebas/evidencias/`. La cobertura HTML/LCOV se genera en `coverage/` y `coverage-unit/`.

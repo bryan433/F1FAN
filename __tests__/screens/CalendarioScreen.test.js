@@ -50,7 +50,7 @@ test('carga el calendario actual con el servicio real, una sola consulta y horar
   expect(screen.getByText('2026-11-08')).toBeTruthy();
   expect(screen.getByText('14:00 (Santiago)')).toBeTruthy();
   expect(getCalendar).toHaveBeenCalledTimes(1);
-  expect(getCalendar).toHaveBeenCalledWith();
+  expect(getCalendar).toHaveBeenCalledWith('2026');
   expect(global.fetch).toHaveBeenCalledTimes(1);
   expect(global.fetch.mock.calls[0][0]).toBe('https://api.jolpi.ca/ergast/f1/2026.json');
   expect(screen.queryByText(/2024|Singapur|09:00 CLT|Ganador:/i)).toBeNull();
@@ -226,4 +226,27 @@ test('una actualización fallida termina la carga y no mantiene un calendario an
   expect(screen.getByText('No se pudo cargar el calendario.')).toBeTruthy();
   expect(screen.queryByText('GP de prueba')).toBeNull();
   expect(screen.UNSAFE_getByType(ScrollView).props.refreshControl.props.refreshing).toBe(false);
+});
+
+test('permite buscar en tiempo real por nombre, país o circuito y limpiar la búsqueda', async () => {
+  global.fetch.mockResolvedValue(okResponse(raceResponse([
+    calendarRace({ round: '1', raceName: 'Gran Premio de Mónaco', Circuit: { circuitName: 'Monte Carlo', Location: { country: 'Monaco' } } }),
+    calendarRace({ round: '2', raceName: 'Gran Premio de Monza', Circuit: { circuitName: 'Autodromo Nazionale Monza', Location: { country: 'Italy' } } }),
+  ])));
+  openCalendar();
+  await screen.findByText('Gran Premio de Mónaco');
+  expect(screen.getByText('Gran Premio de Monza')).toBeTruthy();
+
+  const searchInput = screen.getByLabelText('Buscar carrera en el calendario');
+  fireEvent.changeText(searchInput, 'Mónaco');
+  expect(screen.getByText('Gran Premio de Mónaco')).toBeTruthy();
+  expect(screen.queryByText('Gran Premio de Monza')).toBeNull();
+
+  fireEvent.changeText(searchInput, 'Inexistente');
+  expect(screen.getByText('No se encontraron carreras para "Inexistente".')).toBeTruthy();
+  expect(screen.queryByText('Gran Premio de Mónaco')).toBeNull();
+
+  fireEvent.press(screen.getByText('Limpiar búsqueda'));
+  expect(screen.getByText('Gran Premio de Mónaco')).toBeTruthy();
+  expect(screen.getByText('Gran Premio de Monza')).toBeTruthy();
 });

@@ -1,11 +1,21 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { Colors } from '../theme/colors';
 import Header from '../components/Header';
 import { NEWS_HEADLINES } from '../data/mockData';
 import { Ionicons } from '@expo/vector-icons';
+import AuthService from '../services/AuthService';
 
 export default function MasScreen({ navigation }) {
+  const [userName, setUserName] = useState('Diego Morales');
+
+  useEffect(() => {
+    AuthService.getCurrentUser().then(user => {
+      if (user?.nombre) setUserName(user.nombre);
+      else if (user?.email) setUserName(user.email.split('@')[0]);
+    }).catch(() => {});
+  }, []);
+
   const hubOptions = [
     {
       id: 'favs',
@@ -18,7 +28,7 @@ export default function MasScreen({ navigation }) {
     {
       id: 'profile',
       title: 'Perfil',
-      subtitle: 'Diego Morales',
+      subtitle: userName,
       icon: 'person',
       color: Colors.accentCyan,
       route: 'Perfil'
