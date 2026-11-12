@@ -32,6 +32,14 @@ export default function MasScreen({ navigation }) {
       route: 'RealidadAumentada'
     },
     {
+      id: 'race-search',
+      title: 'Buscar carrera (OpenF1)',
+      subtitle: 'Trazado real en vista AR',
+      icon: 'search',
+      color: Colors.accentCyan,
+      route: 'BuscarCarrera'
+    },
+    {
       id: 'history',
       title: 'Histórico',
       subtitle: 'Desde 2023 (Panel Web)',

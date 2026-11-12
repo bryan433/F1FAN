@@ -10,6 +10,7 @@ import ARScreen from '../screens/ARScreen';
 import FavoritosScreen from '../screens/FavoritosScreen';
 import PerfilScreen from '../screens/PerfilScreen';
 import HistorialWebScreen from '../screens/HistorialWebScreen';
+import BuscarCarreraScreen from '../screens/BuscarCarreraScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -31,6 +32,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Favoritos" component={FavoritosScreen} />
         <Stack.Screen name="Perfil" component={PerfilScreen} />
         <Stack.Screen name="HistorialWeb" component={HistorialWebScreen} />
+        <Stack.Screen name="BuscarCarrera" component={BuscarCarreraScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

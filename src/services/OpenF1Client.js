@@ -3,6 +3,29 @@
  * Endpoint base: https://api.openf1.org/v1/
  * Cumple con RNF-01 (< 3s), RNF-02 (no sobrepasar 30 req/min) y Tabla 4 del SRS.
  */
+
+// Claves con operador de comparación de OpenF1, p. ej. { 'date>=': '2024-03-02T15:05:20.099Z' }.
+const CLAVE_COMPARACION = /^([A-Za-z0-9_]+)(>=|<=|>|<)$/;
+
+/**
+ * Construye la query string. Los parámetros normales se codifican igual que antes
+ * (URLSearchParams); los filtros de comparación se envían con el operador sin codificar
+ * (`date>=valor`), que es la sintaxis documentada por OpenF1, y con el valor codificado.
+ */
+export function buildQueryString(params = {}) {
+  const normales = new URLSearchParams();
+  const comparaciones = [];
+  Object.entries(params).forEach(([clave, valor]) => {
+    const coincidencia = CLAVE_COMPARACION.exec(clave);
+    if (coincidencia) {
+      comparaciones.push(`${coincidencia[1]}${coincidencia[2]}${encodeURIComponent(String(valor))}`);
+    } else {
+      normales.append(clave, valor);
+    }
+  });
+  return [normales.toString(), ...comparaciones].filter(Boolean).join('&');
+}
+
 class OpenF1Client {
   constructor() {
     this.baseUrl = 'https://api.openf1.org/v1';
@@ -24,7 +47,7 @@ class OpenF1Client {
     }
     this.lastRequestTimestamp = Date.now();
 
-    const queryString = new URLSearchParams(params).toString();
+    const queryString = buildQueryString(params);
     const url = `${this.baseUrl}${endpoint}${queryString ? `?${queryString}` : ''}`;
 
     const controller = new AbortController();
@@ -39,7 +62,8 @@ class OpenF1Client {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error(`OpenF1 Error HTTP ${response.status}`);
+        // OpenF1 responde 404 cuando la consulta no tiene resultados; `status` permite distinguirlo.
+        throw Object.assign(new Error(`OpenF1 Error HTTP ${response.status}`), { status: response.status });
       }
       return await response.json();
     } catch (error) {
@@ -101,15 +125,27 @@ class OpenF1Client {
   }
 
   /**
+   * Obtiene las vueltas registradas de una sesión
+   * Endpoint: /laps?session_key=ID&lap_number=N&driver_number=NUM
+   * @param {object} params filtros de OpenF1 (session_key, lap_number, driver_number...)
+   */
+  async getLaps(params = {}) {
+    return this.fetchWithRateLimit('/laps', params);
+  }
+
+  /**
    * Obtiene telemetría y coordenadas de posición para simulación / RA
    * Endpoint: /location?session_key=ID&driver_number=NUM
-   * @param {number} sessionKey 
-   * @param {number} driverNumber 
+   * @param {number} sessionKey
+   * @param {number} driverNumber
+   * @param {object} extraParams filtros adicionales, p. ej. ventana de tiempo
+   *   { 'date>=': inicioISO, 'date<=': finISO }
    */
-  async getLocation(sessionKey, driverNumber) {
+  async getLocation(sessionKey, driverNumber, extraParams = {}) {
     return this.fetchWithRateLimit('/location', {
       session_key: sessionKey,
-      ...(driverNumber ? { driver_number: driverNumber } : {})
+      ...(driverNumber ? { driver_number: driverNumber } : {}),
+      ...extraParams
     });
   }
 }

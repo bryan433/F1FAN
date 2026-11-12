@@ -1,6 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { Colors } from '../theme/colors';
+import { MAX_TRACK_SEGMENTS, TRACK_CANVAS, esPuntoValido, samplePoints } from '../utils/trackGeometry';
+import { USE_NATIVE_DRIVER } from '../utils/motion';
+import useReduceMotion from '../hooks/useReduceMotion';
+
+// Ritmo del marcador de referencia sobre un trazado real: ms por punto muestreado (~150 puntos ≈ 37 s
+// por vuelta). Los puntos de OpenF1 están equiespaciados en el tiempo, así que el marcador conserva
+// el perfil de velocidad de la vuelta real (más lento en las curvas lentas).
+export const REAL_TRACK_MS_PER_POINT = 250;
+// Duración de la aparición progresiva del trazado real ("se dibuja" en el sentido de la vuelta).
+export const TRACK_REVEAL_MS = 600;
+const REAL_SEGMENT_THICKNESS = 4;
+const REFERENCE_MARKER_SIZE = 16;
 
 // Coordenadas normalizadas aproximadas del trazado de Marina Bay Street Circuit
 const TRACK_POINTS = [
@@ -23,7 +35,179 @@ const TRACK_POINTS = [
   { x: 30, y: 70 },
 ];
 
-export default function TrackMap({ circuitName = 'MARINA BAY STREET CIRCUIT', isLive = true, isDemo = false }) {
+/**
+ * Posición, largo y ángulo de un segmento rotado entre dos puntos.
+ * `centrar` ubica el centro del segmento sobre la línea (trazado real); el trazado de
+ * demostración conserva su posicionamiento original.
+ */
+function geometriaSegmento(pt, next, { grosor = 0, centrar = false }) {
+  const midX = (pt.x + next.x) / 2;
+  const midY = (pt.y + next.y) / 2;
+  const length = Math.hypot(next.x - pt.x, next.y - pt.y);
+  const angle = Math.atan2(next.y - pt.y, next.x - pt.x) * (180 / Math.PI);
+  return {
+    left: midX - length / 2,
+    top: centrar ? midY - grosor / 2 : midY,
+    width: length,
+    transform: [{ rotate: `${angle}deg` }],
+  };
+}
+
+/** Segmentos rotados que dibujan la polilínea del trazado de demostración. */
+function renderSegments(trazado, { estilo }) {
+  return trazado.slice(0, -1).map((pt, index) => (
+    <View key={index} style={[estilo, geometriaSegmento(pt, trazado[index + 1], {})]} />
+  ));
+}
+
+/**
+ * Mapa del circuito con marcadores animados.
+ * Sin `points` dibuja el trazado de demostración de Marina Bay con dos autos simulados.
+ * Con `points` (coordenadas ya normalizadas al lienzo TRACK_CANVAS) dibuja ese trazado real
+ * y anima un único marcador de referencia; la animación no representa posiciones en vivo.
+ */
+export default function TrackMap({ circuitName = 'MARINA BAY STREET CIRCUIT', isLive = true, isDemo = false, points, markerLabel }) {
+  const realTrack = useMemo(() => {
+    const validos = Array.isArray(points) ? points.filter(esPuntoValido) : [];
+    return validos.length >= 2 ? samplePoints(validos, MAX_TRACK_SEGMENTS) : null;
+  }, [points]);
+  // Un trazado distinto se vuelve a dibujar desde cero.
+  const claveTrazado = useMemo(() => (realTrack ? realTrack.map(p => `${p.x},${p.y}`).join(';') : ''), [realTrack]);
+
+  if (realTrack) {
+    return <TrazadoReal key={claveTrazado} trazado={realTrack} circuitName={circuitName} isLive={isLive} markerLabel={markerLabel} />;
+  }
+  return <TrazadoDemo circuitName={circuitName} isLive={isLive} isDemo={isDemo} />;
+}
+
+/**
+ * Trazado real de OpenF1. Al aparecer se "dibuja" segmento a segmento en el sentido de la vuelta;
+ * luego un marcador de referencia lo recorre de forma continua, interpolando su posición entre
+ * los puntos muestreados (solo transformaciones y opacidad). Con "Reducir movimiento" el trazado
+ * aparece completo de inmediato.
+ */
+function TrazadoReal({ trazado, circuitName, isLive, markerLabel }) {
+  const reducir = useReduceMotion();
+  const ultimo = trazado.length - 1; // índice del último punto = cantidad de segmentos
+  const revelado = useRef(new Animated.Value(reducir ? ultimo : 0)).current; // segmentos visibles
+  const progreso = useRef(new Animated.Value(0)).current; // posición del marcador, en puntos
+  const recorrido = useRef(null);
+  const [dibujado, setDibujado] = useState(reducir);
+
+  useEffect(() => {
+    if (reducir) return undefined;
+    const aparicion = Animated.timing(revelado, {
+      toValue: ultimo,
+      duration: TRACK_REVEAL_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: USE_NATIVE_DRIVER,
+    });
+    aparicion.start(({ finished }) => { if (finished) setDibujado(true); });
+    return () => aparicion.stop();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Si la preferencia de movimiento reducido llega después de montar, el trazado se completa ya.
+  useEffect(() => {
+    if (!reducir) return;
+    revelado.stopAnimation();
+    revelado.setValue(ultimo);
+    setDibujado(true);
+  }, [reducir]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isLive || !dibujado) return undefined;
+    let activo = true;
+    // Recorre desde `desde` hasta el final de la vuelta y encadena la siguiente desde el inicio.
+    // (Se encadena a mano en lugar de Animated.loop, que sin módulo nativo hace una sola vuelta).
+    const recorrer = desde => {
+      let arrancando = true;
+      const animacion = Animated.timing(progreso, {
+        toValue: ultimo,
+        duration: (ultimo - desde) * REAL_TRACK_MS_PER_POINT,
+        easing: Easing.linear,
+        useNativeDriver: USE_NATIVE_DRIVER,
+      });
+      recorrido.current = animacion;
+      animacion.start(({ finished }) => {
+        // Una animación que termina en el mismo ciclo en que empezó (duración nula o animaciones
+        // simuladas) no encadena otra vuelta: evita una recursión sin fin.
+        if (!finished || !activo || arrancando) return;
+        progreso.setValue(0);
+        recorrer(0);
+      });
+      arrancando = false;
+    };
+    // Continúa desde donde quedó el marcador (por ejemplo, tras una pausa).
+    progreso.stopAnimation(valor => {
+      if (!activo) return;
+      const desde = typeof valor === 'number' && valor > 0 && valor < ultimo ? valor : 0;
+      progreso.setValue(desde);
+      recorrer(desde);
+    });
+    return () => {
+      activo = false;
+      recorrido.current?.stop();
+      recorrido.current = null;
+    };
+  }, [isLive, dibujado]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Los segmentos y las interpolaciones solo cambian con el trazado.
+  const segmentos = useMemo(() => trazado.slice(0, -1).map((pt, indice) => (
+    <Animated.View
+      key={indice}
+      style={[
+        styles.realTrackSegment,
+        geometriaSegmento(pt, trazado[indice + 1], { grosor: REAL_SEGMENT_THICKNESS, centrar: true }),
+        { opacity: revelado.interpolate({ inputRange: [indice, indice + 1], outputRange: [0, 1], extrapolate: 'clamp' }) },
+      ]}
+    />
+  )), [trazado, revelado]);
+
+  const marcador = useMemo(() => {
+    const indices = trazado.map((_, indice) => indice);
+    const mitad = REFERENCE_MARKER_SIZE / 2;
+    return {
+      opacity: revelado.interpolate({ inputRange: [ultimo - 1, ultimo], outputRange: [0, 1], extrapolate: 'clamp' }),
+      transform: [
+        { translateX: progreso.interpolate({ inputRange: indices, outputRange: trazado.map(p => p.x - mitad) }) },
+        { translateY: progreso.interpolate({ inputRange: indices, outputRange: trazado.map(p => p.y - mitad) }) },
+      ],
+    };
+  }, [trazado, revelado, progreso, ultimo]);
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={[styles.trackName, styles.realHeaderText]}>{circuitName}</Text>
+        <View style={[styles.statusBadge, styles.demoBadge]}>
+          <Text style={[styles.statusText, styles.demoText, styles.realHeaderText]}>TRAZADO REAL</Text>
+        </View>
+      </View>
+
+      <View style={[styles.mapCanvas, styles.realCanvas]}>
+        {segmentos}
+        {/* Marcador de referencia: recorre el trazado a ritmo simulado */}
+        <Animated.View testID="track-reference-marker" style={[styles.referenceMarker, marcador]} />
+      </View>
+
+      <View style={[styles.legendRow, styles.realLegendRow]}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: Colors.accentCyan }]} />
+          <Text style={[styles.legendText, styles.realLegendText]}>Trazado real · OpenF1</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: '#FFFFFF' }]} />
+          <Text style={[styles.legendText, styles.realLegendText]}>
+            {markerLabel ? `Auto ${markerLabel} · animación simulada` : 'Animación simulada'}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/** Trazado de demostración de Marina Bay con dos autos simulados. */
+function TrazadoDemo({ circuitName, isLive, isDemo }) {
   const [carProgress, setCarProgress] = useState(0);
 
   useEffect(() => {
@@ -33,6 +217,9 @@ export default function TrackMap({ circuitName = 'MARINA BAY STREET CIRCUIT', is
     }, 1200);
     return () => clearInterval(interval);
   }, [isLive]);
+
+  // Los segmentos son fijos: se memorizan para que la animación no los recalcule.
+  const segments = useMemo(() => renderSegments(TRACK_POINTS, { estilo: styles.trackSegment }), []);
 
   const carPos = TRACK_POINTS[carProgress] || TRACK_POINTS[0];
   const secondCarIndex = (carProgress + 3) % TRACK_POINTS.length;
@@ -49,29 +236,7 @@ export default function TrackMap({ circuitName = 'MARINA BAY STREET CIRCUIT', is
 
       <View style={styles.mapCanvas}>
         {/* Renderizado de segmentos del trazado */}
-        {TRACK_POINTS.map((pt, index) => {
-          if (index === TRACK_POINTS.length - 1) return null;
-          const next = TRACK_POINTS[index + 1];
-          const midX = (pt.x + next.x) / 2;
-          const midY = (pt.y + next.y) / 2;
-          const length = Math.hypot(next.x - pt.x, next.y - pt.y);
-          const angle = Math.atan2(next.y - pt.y, next.x - pt.x) * (180 / Math.PI);
-
-          return (
-            <View
-              key={index}
-              style={[
-                styles.trackSegment,
-                {
-                  left: midX - length / 2,
-                  top: midY,
-                  width: length,
-                  transform: [{ rotate: `${angle}deg` }],
-                },
-              ]}
-            />
-          );
-        })}
+        {segments}
 
         {/* Marcadores de Curvas Principales */}
         <View style={[styles.cornerPin, { left: 190, top: 40 }]}>
@@ -223,6 +388,41 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 11,
     fontWeight: '600',
+  },
+  // ---- Trazado real (OpenF1) ----
+  realHeaderText: {
+    fontSize: 12,
+  },
+  realCanvas: {
+    width: TRACK_CANVAS.width,
+    height: TRACK_CANVAS.height,
+    alignSelf: 'center',
+  },
+  realTrackSegment: {
+    position: 'absolute',
+    height: REAL_SEGMENT_THICKNESS,
+    backgroundColor: 'rgba(0, 210, 190, 0.75)',
+    borderRadius: REAL_SEGMENT_THICKNESS / 2,
+  },
+  referenceMarker: {
+    position: 'absolute',
+    // Se posiciona solo con transformaciones (translateX/Y) desde el origen del lienzo.
+    left: 0,
+    top: 0,
+    width: REFERENCE_MARKER_SIZE,
+    height: REFERENCE_MARKER_SIZE,
+    borderRadius: REFERENCE_MARKER_SIZE / 2,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 3,
+    borderColor: Colors.primaryRed,
+    zIndex: 20,
+  },
+  realLegendRow: {
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  realLegendText: {
+    fontSize: 12,
   },
 });
 
