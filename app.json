@@ -23,7 +23,11 @@
       "package": "com.f1fan.app"
     },
     "web": {
-      "favicon": "./assets/favicon.png",
+      "name": "F1Fan",
+      "lang": "es",
+      "description": "Calendario, clasificaciones y favoritos de Fórmula 1 en F1Fan.",
+      "themeColor": "#0D0F12",
+      "favicon": "./public/icons/favicon-32.png",
       "bundler": "metro"
     }
   }
