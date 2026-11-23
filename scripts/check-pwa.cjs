@@ -2,6 +2,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { createPrecache } = require('./generate-sw.cjs');
 
 const project = path.resolve(__dirname, '..');
 const publicDir = path.join(project, 'public');
@@ -71,9 +72,10 @@ try {
   assert.doesNotMatch(html, /%LANG_ISO_CODE%|%WEB_TITLE%/);
 
   const scripts = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*>/g)];
-  assert.ok(scripts.length > 0, 'Expo did not inject the production bundle');
+  assert.ok(scripts.some(([, src]) => /^\/_expo\/.*\.js$/.test(src)), 'Expo did not inject the production bundle');
+  assert.ok(scripts.some(([, src]) => src === '/register-sw.js'), 'Missing web service worker registration');
   for (const [, src] of scripts) {
-    assert.match(src, /^\/_expo\/.*\.js$/);
+    assert.ok(src === '/register-sw.js' || /^\/_expo\/.*\.js$/.test(src), 'Unexpected script: ' + src);
     exportedFile(src);
   }
   assert.notEqual(html, read(path.join(publicDir, 'index.html')), 'Export must process the Expo template');
@@ -85,6 +87,21 @@ try {
       'Public asset changed during export: ' + relative
     );
   }
+  const expected = createPrecache(dist);
+  assert.deepEqual(JSON.parse(read(exportedFile('/pwa-precache.json'))), expected.inventory, 'Stale precache inventory');
+  assert.equal(read(exportedFile('/sw.js')), expected.worker, 'Service worker does not match this build');
+  const vercel = JSON.parse(read(path.join(project, 'vercel.json')));
+  assert.equal(vercel.buildCommand, 'npm run build:web');
+  assert.equal(vercel.outputDirectory, 'dist');
+  const swHeaders = vercel.headers.find(rule => rule.source === '/sw.js').headers;
+  assert.ok(swHeaders.some(header => header.key === 'Content-Type' && header.value.startsWith('application/javascript')));
+  assert.ok(swHeaders.some(header => header.key === 'Cache-Control' && header.value.includes('no-store')));
+  const fallback = new RegExp('^' + vercel.rewrites[0].source + '$');
+  assert.ok(fallback.test('/') && fallback.test('/Calendario'));
+  for (const url of ['/sw.js', '/register-sw.js', '/manifest.webmanifest', '/pwa-precache.json', '/_expo/missing.js', '/icons/missing.png', '/assets/missing', '/api/private']) {
+    assert.equal(fallback.test(url), false, 'Missing resource must not become SPA HTML: ' + url);
+  }
+  console.log('PWA shell OK: ' + expected.inventory.resources.length + ' resources; version ' + expected.inventory.buildId);
   console.log('PWA export OK: manifest, 192/512 PNG, Apple 180 PNG, favicon 32 PNG, public assets and Expo entry.');
   console.log('Installation, HTTPS hosting and browser/OS compatibility still require manual checks.');
 } catch (error) {
